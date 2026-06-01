@@ -188,11 +188,7 @@ function App() {
 
       <header className="nav">
         <a className="brand" href="#top" aria-label="Abelle Studios home">
-          <img src="/assets/logo-full.png" alt="Abelle Studios" className="brand-logo" />
-          <span className="brand-text">
-            <span className="brand-main">Abelle Studios</span>
-            <span className="brand-sub">Creative Studio · San Jose, Antique</span>
-          </span>
+          <img src="/assets/logo-full-black.png" alt="Abelle Studios" className="brand-logo" />
         </a>
 
         <nav className="nav-links">
@@ -400,7 +396,6 @@ function App() {
             </div>
           </div>
           <aside className="quote-card">
-            <img src="/assets/logo-full.png" alt="Abelle Studios logo" />
             <small>our promise</small>
             <blockquote>“All your memories, create it here.”</blockquote>
             <span>Abelle Studios · San Jose, Antique</span>
@@ -409,26 +404,7 @@ function App() {
       </section>
 
       <footer className="footer">
-        <div className="footer-brand">
-          <img src="/assets/logo-full.png" alt="Abelle Studios" />
-          <div>
-            <strong>Abelle Studios</strong>
-            <span>{phoneNumber} · Dalipe, San Jose, Antique</span>
-          </div>
-        </div>
-        <div className="footer-socials">
-          {socialLinks.map(({ name, href, icon }) => (
-            <a
-              key={name}
-              href={href}
-              target={href.startsWith("http") ? "_blank" : undefined}
-              rel={href.startsWith("http") ? "noreferrer" : undefined}
-              aria-label={name}
-            >
-              <SocialIcon type={icon} />
-            </a>
-          ))}
-        </div>
+        <p>© 2026 Abelle Studios. All rights reserved.</p>
       </footer>
     </main>
   );
@@ -468,9 +444,9 @@ button { font: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand-logo {
-  width: clamp(150px, 20vw, 260px);
+  width: clamp(170px, 24vw, 320px);
   height: auto;
-  max-height: 58px;
+  max-height: 64px;
   object-fit: contain;
   display: block;
   opacity: 1;
@@ -598,25 +574,27 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
 .social-link { display: inline-flex; align-items: center; gap: 9px; padding: 10px 13px; background: var(--paper); border: 1px solid var(--faint); color: #444; font-size: 13px; transition: .2s ease; }
 .social-link:hover { transform: translateY(-2px); color: var(--gold-dark); }
 .quote-card { background: var(--paper); border: 1px solid var(--faint); padding: 44px 38px; text-align: center; box-shadow: var(--shadow); }
-.quote-card img { width: min(260px, 88%); max-height: 90px; object-fit: contain; margin: 0 auto 18px; display: block; }
+
 .quote-card small { font-family: 'Cormorant Garamond', Georgia, serif; color: #aaa; font-style: italic; font-size: 18px; }
 .quote-card blockquote { margin: 14px 0 18px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 34px; line-height: 1.25; font-weight: 300; }
 .quote-card span { color: #aaa; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 
-.footer { background: var(--dark); color: rgba(244,242,239,.45); padding: 28px max(24px, calc((100vw - 1100px) / 2)); display: flex; justify-content: space-between; align-items: center; gap: 18px; }
-.footer-brand { display: flex; align-items: center; gap: 14px; }
-.footer-brand img {
-  width: min(210px, 72vw);
-  height: auto;
-  max-height: 62px;
-  object-fit: contain;
-  opacity: .92;
-  filter: none;
+.footer {
+  background: var(--dark);
+  color: rgba(244,242,239,.72);
+  padding: 30px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
 }
-.footer strong { display: block; font-family: 'Cormorant Garamond', Georgia, serif; color: var(--bg); font-size: 22px; font-weight: 400; }
-.footer span { font-size: 12px; color: rgba(244,242,239,.42); }
-.footer-socials { display: flex; gap: 10px; }
-.footer-socials a { color: var(--bg); background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+
+.footer p {
+  margin: 0;
+  color: rgba(244,242,239,.72);
+  font-size: 13px;
+  letter-spacing: .06em;
+}
 
 @media (max-width: 980px) {
   .hero, .contact-grid { grid-template-columns: 1fr; }
@@ -651,8 +629,6 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
   .slideshow { min-height: 310px; }
   .promo-grid, .why-grid { grid-template-columns: 1fr; }
   .footer { flex-direction: column; text-align: center; }
-  .footer-brand { flex-direction: column; }
-  .footer-socials { justify-content: center; }
 }
 `;
 
