@@ -131,18 +131,47 @@ const slideshowPhotos = [
 ];
 
 function SocialIcon({ type, size = 17 }) {
-  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true" };
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    xmlns: "http://www.w3.org/2000/svg",
+    "aria-hidden": "true",
+  };
+
   switch (type) {
     case "phone":
-      return <svg {...common}><path d="M6.6 10.8c1.8 3.5 3.1 4.8 6.6 6.6l2.1-2.1c.4-.4.9-.5 1.4-.3 1 .3 2 .5 3.1.5.7 0 1.2.5 1.2 1.2v3.1c0 .7-.5 1.2-1.2 1.2C10.4 21 3 13.6 3 4.2 3 3.5 3.5 3 4.2 3h3.1c.7 0 1.2.5 1.2 1.2 0 1.1.2 2.1.5 3.1.1.5 0 1-.3 1.4l-2.1 2.1z" fill="currentColor"/></svg>;
+      return (
+        <svg {...common}>
+          <path d="M6.6 10.8c1.8 3.5 3.1 4.8 6.6 6.6l2.1-2.1c.4-.4.9-.5 1.4-.3 1 .3 2 .5 3.1.5.7 0 1.2.5 1.2 1.2v3.1c0 .7-.5 1.2-1.2 1.2C10.4 21 3 13.6 3 4.2 3 3.5 3.5 3 4.2 3h3.1c.7 0 1.2.5 1.2 1.2 0 1.1.2 2.1.5 3.1.1.5 0 1-.3 1.4l-2.1 2.1z" fill="currentColor" />
+        </svg>
+      );
     case "facebook":
-      return <svg {...common}><path d="M14 8h2V5h-2c-2.8 0-4.5 1.7-4.5 4.5V12H7v3h2.5v6h3.2v-6h2.6l.5-3h-3.1V9.7c0-1.1.4-1.7 1.3-1.7z" fill="currentColor"/></svg>;
+      return (
+        <svg {...common}>
+          <path d="M14 8h2V5h-2c-2.8 0-4.5 1.7-4.5 4.5V12H7v3h2.5v6h3.2v-6h2.6l.5-3h-3.1V9.7c0-1.1.4-1.7 1.3-1.7z" fill="currentColor" />
+        </svg>
+      );
     case "instagram":
-      return <svg {...common}><path d="M7.5 3h9A4.5 4.5 0 0 1 21 7.5v9a4.5 4.5 0 0 1-4.5 4.5h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3zm0 2A2.5 2.5 0 0 0 5 7.5v9A2.5 2.5 0 0 0 7.5 19h9a2.5 2.5 0 0 0 2.5-2.5v-9A2.5 2.5 0 0 0 16.5 5h-9z" fill="currentColor"/><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.9-2.7a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z" fill="currentColor"/></svg>;
+      return (
+        <svg {...common}>
+          <path d="M7.5 3h9A4.5 4.5 0 0 1 21 7.5v9a4.5 4.5 0 0 1-4.5 4.5h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3zm0 2A2.5 2.5 0 0 0 5 7.5v9A2.5 2.5 0 0 0 7.5 19h9a2.5 2.5 0 0 0 2.5-2.5v-9A2.5 2.5 0 0 0 16.5 5h-9z" fill="currentColor" />
+          <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.9-2.7a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z" fill="currentColor" />
+        </svg>
+      );
     case "messenger":
-      return <svg {...common}><path d="M12 3C6.9 3 3 6.7 3 11.5c0 2.7 1.3 5.1 3.4 6.7V21l3.1-1.7c.8.2 1.6.3 2.5.3 5.1 0 9-3.7 9-8.5S17.1 3 12 3zm1 11.4-2.3-2.5-4.5 2.5 5-5.3 2.3 2.5 4.4-2.5-4.9 5.3z" fill="currentColor"/></svg>;
+      return (
+        <svg {...common}>
+          <path d="M12 3C6.9 3 3 6.7 3 11.5c0 2.7 1.3 5.1 3.4 6.7V21l3.1-1.7c.8.2 1.6.3 2.5.3 5.1 0 9-3.7 9-8.5S17.1 3 12 3zm1 11.4-2.3-2.5-4.5 2.5 5-5.3 2.3 2.5 4.4-2.5-4.9 5.3z" fill="currentColor" />
+        </svg>
+      );
     case "tiktok":
-      return <svg {...common}><path d="M15.2 3c.3 2.2 1.5 3.8 3.8 4.1v3c-1.4 0-2.7-.4-3.8-1.1v5.9c0 3.1-2.5 5.5-5.5 5.5s-5.4-2.4-5.4-5.4S6.7 9.6 9.7 9.6c.4 0 .7 0 1 .1V13c-.3-.2-.6-.2-1-.2-1.2 0-2.2 1-2.2 2.2s1 2.2 2.2 2.2 2.2-.9 2.2-2.2V3h3.3z" fill="currentColor"/></svg>;
+      return (
+        <svg {...common}>
+          <path d="M15.2 3c.3 2.2 1.5 3.8 3.8 4.1v3c-1.4 0-2.7-.4-3.8-1.1v5.9c0 3.1-2.5 5.5-5.5 5.5s-5.4-2.4-5.4-5.4S6.7 9.6 9.7 9.6c.4 0 .7 0 1 .1V13c-.3-.2-.6-.2-1-.2-1.2 0-2.2 1-2.2 2.2s1 2.2 2.2 2.2 2.2-.9 2.2-2.2V3h3.3z" fill="currentColor" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -165,6 +194,7 @@ function App() {
             <span className="brand-sub">Creative Studio · San Jose, Antique</span>
           </span>
         </a>
+
         <nav className="nav-links">
           <a href="#packages">Packages</a>
           <a href="#promos">Promos</a>
@@ -190,7 +220,13 @@ function App() {
           </div>
           <div className="hero-socials" aria-label="Abelle Studios social links">
             {socialLinks.map(({ name, href, icon }) => (
-              <a key={name} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} aria-label={name}>
+              <a
+                key={name}
+                href={href}
+                target={href.startsWith("http") ? "_blank" : undefined}
+                rel={href.startsWith("http") ? "noreferrer" : undefined}
+                aria-label={name}
+              >
                 <SocialIcon type={icon} />
               </a>
             ))}
@@ -272,7 +308,12 @@ function App() {
           <article className="custom-card">
             <div className="slideshow" aria-label="Abelle Studios sample photos slideshow">
               {slideshowPhotos.map((photo, index) => (
-                <img key={photo} src={photo} alt="Abelle Studios sample work" style={{ animationDelay: `${index * 3}s` }} />
+                <img
+                  key={photo}
+                  src={photo}
+                  alt="Abelle Studios sample work"
+                  style={{ animationDelay: `${index * 3}s` }}
+                />
               ))}
             </div>
             <div>
@@ -342,7 +383,13 @@ function App() {
             </div>
             <div className="social-row">
               {socialLinks.map(({ name, label, href, icon }) => (
-                <a key={name} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} className="social-link">
+                <a
+                  key={name}
+                  href={href}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noreferrer" : undefined}
+                  className="social-link"
+                >
                   <SocialIcon type={icon} />
                   <span>{label}</span>
                 </a>
@@ -368,7 +415,13 @@ function App() {
         </div>
         <div className="footer-socials">
           {socialLinks.map(({ name, href, icon }) => (
-            <a key={name} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} aria-label={name}>
+            <a
+              key={name}
+              href={href}
+              target={href.startsWith("http") ? "_blank" : undefined}
+              rel={href.startsWith("http") ? "noreferrer" : undefined}
+              aria-label={name}
+            >
               <SocialIcon type={icon} />
             </a>
           ))}
@@ -432,8 +485,8 @@ p { color: var(--muted); line-height: 1.75; }
 .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.12); }
 .btn-dark { background: var(--dark); color: var(--bg); }
 .btn-outline { background: transparent; color: var(--ink); }
-.btn-gold { background: var(--gold); border-color: var(--gold); color: white; }
-.btn-gold:hover { background: var(--gold-dark); border-color: var(--gold-dark); }
+.btn-gold { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+.btn-gold:hover { background: var(--gold-dark); border-color: var(--gold-dark); color: var(--paper); }
 .full { width: 100%; }
 
 .hero { padding: 72px 0 60px; display: grid; grid-template-columns: 1fr 440px; gap: 64px; align-items: center; }
@@ -463,10 +516,14 @@ p { color: var(--muted); line-height: 1.75; }
 .service-list span::before { content: ''; width: 15px; height: 15px; border-radius: 50%; background: var(--gold); flex: 0 0 auto; }
 
 .package-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
-.package-card { background: var(--paper); border: 1px solid var(--faint); box-shadow: 0 12px 34px rgba(0,0,0,.045); display: grid; grid-template-rows: 360px auto; overflow: hidden; }
-.package-media { margin: 0; background: var(--soft); overflow: hidden; }
-.package-media img { width: 100%; height: 100%; object-fit: cover; object-position: center 34%; display: block; transition: transform .35s ease; }
-.package-card:hover .package-media img { transform: scale(1.025); }
+.package-card { background: var(--paper); border: 1px solid var(--faint); box-shadow: 0 12px 34px rgba(0,0,0,.045); display: grid; grid-template-rows: auto auto; overflow: hidden; }
+.package-media { margin: 0; background: var(--soft); overflow: hidden; aspect-ratio: 4 / 3; }
+.package-media img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+.package-card:nth-child(1) .package-media img { object-position: center 32%; }
+.package-card:nth-child(2) .package-media img { object-position: center 24%; }
+.package-card:nth-child(3) .package-media img { object-position: center 45%; }
+.package-card:nth-child(4) .package-media img { object-position: center 42%; }
+.package-card:hover .package-media img { transform: scale(1.018); }
 .package-content { padding: 34px; display: flex; flex-direction: column; min-height: 580px; }
 .package-topline { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
 .package-topline span { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 56px; line-height: .8; color: rgba(0,0,0,.07); }
@@ -539,7 +596,6 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
   .hero, .contact-grid { grid-template-columns: 1fr; }
   .hero-visual { max-width: 520px; }
   .package-grid { grid-template-columns: 1fr; }
-  .package-card { grid-template-rows: 420px auto; }
   .studio-strip { grid-template-columns: 1fr; }
   .studio-strip div { border-right: 0; border-bottom: 1px solid var(--faint); }
   .studio-strip div:last-child { border-bottom: 0; }
@@ -560,9 +616,8 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
   .photo-stack img { position: static; width: 100% !important; height: auto !important; aspect-ratio: 4 / 5; }
   .photo-small.top { display: none; }
   .services-intro, .packages-section, .why-section, .promo-section, .contact-section { padding: 46px 0; }
-  .package-card { grid-template-rows: auto auto; }
-  .package-media { height: auto; }
-  .package-media img { height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+  .package-media { aspect-ratio: 4 / 3; }
+  .package-media img { height: 100%; object-fit: cover; }
   .package-content, .custom-card > div:not(.slideshow) { padding: 26px 22px; min-height: auto; }
   .package-footer { display: block; }
   .custom-card { grid-template-columns: 1fr; }
