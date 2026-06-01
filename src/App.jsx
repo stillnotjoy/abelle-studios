@@ -123,11 +123,11 @@ const whyUs = [
 ];
 
 const slideshowPhotos = [
-  "/assets/personal.jpg",
-  "/assets/duo.jpg",
-  "/assets/barkada.jpg",
-  "/assets/family.jpg",
-  "/assets/newborn.jpg",
+  { src: "/assets/personal.jpg", position: "center 18%" },
+  { src: "/assets/duo.jpg", position: "center 14%" },
+  { src: "/assets/barkada.jpg", position: "center 38%" },
+  { src: "/assets/family.jpg", position: "center 36%" },
+  { src: "/assets/newborn.jpg", position: "center 28%" },
 ];
 
 function SocialIcon({ type, size = 17 }) {
@@ -309,10 +309,13 @@ function App() {
             <div className="slideshow" aria-label="Abelle Studios sample photos slideshow">
               {slideshowPhotos.map((photo, index) => (
                 <img
-                  key={photo}
-                  src={photo}
+                  key={photo.src}
+                  src={photo.src}
                   alt="Abelle Studios sample work"
-                  style={{ animationDelay: `${index * 3}s` }}
+                  style={{
+                    animationDelay: `${index * 3}s`,
+                    objectPosition: photo.position,
+                  }}
                 />
               ))}
             </div>
@@ -543,10 +546,10 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
 .custom-card { grid-column: 1 / -1; background: var(--dark); color: var(--bg); min-height: 390px; display: grid; grid-template-columns: 42% 1fr; overflow: hidden; }
 .slideshow { position: relative; min-height: 390px; overflow: hidden; background: #222; }
 .slideshow img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: fadeSlide 15s infinite; filter: saturate(.92); }
-.custom-card > div:not(.slideshow) { padding: 42px; display: flex; flex-direction: column; justify-content: center; }
+.custom-card > div:not(.slideshow) { padding: 42px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
 .custom-card h3 { color: var(--bg); }
 .custom-card p { color: rgba(244,242,239,.6); max-width: 560px; }
-.custom-card .btn { align-self: flex-start; margin-top: 18px; }
+.custom-card .btn { align-self: center; margin-top: 18px; }
 @keyframes fadeSlide {
   0% { opacity: 0; transform: scale(1.04); }
   5% { opacity: 1; }
