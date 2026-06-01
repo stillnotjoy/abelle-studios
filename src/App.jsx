@@ -237,12 +237,47 @@ export default function AbelleStudios() {
           cursor: default;
         }
         .gallery-polaroid:hover { transform: rotate(0deg) scale(1.03); }
+        /* ── TABLET (max 768px) ── */
+        @media (max-width: 768px) {
+          .pkg-grid { grid-template-columns: 1fr !important; }
+          .student-grid { grid-template-columns: 1fr !important; }
+          .contact-grid { grid-template-columns: 1fr !important; }
+          .why-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        /* ── MOBILE (max 640px) ── */
         @media (max-width: 640px) {
-          .hero-grid { flex-direction: column !important; }
+          .hero-grid { flex-direction: column !important; gap: 32px !important; }
           .pkg-grid { grid-template-columns: 1fr !important; }
           .contact-grid { grid-template-columns: 1fr !important; }
           .student-grid { grid-template-columns: 1fr !important; }
           .why-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+          /* Nav */
+          nav { padding: 12px 16px !important; }
+          nav img { height: 28px !important; }
+
+          /* Hero */
+          .hero-polaroids { display: none !important; }
+
+          /* Sections */
+          section, .section-wrap { padding-left: 16px !important; padding-right: 16px !important; }
+
+          /* Package cards */
+          .pkg-card { padding: 24px 20px !important; }
+
+          /* Buttons */
+          .btn-primary, .btn-outline, .btn-gold {
+            width: 100% !important;
+            text-align: center !important;
+            padding: 14px 20px !important;
+          }
+
+          /* Contact buttons stack */
+          .contact-btns { flex-direction: column !important; }
+
+          /* Footer */
+          footer > div { flex-direction: column !important; text-align: center !important; gap: 12px !important; }
         }
       `}</style>
 
@@ -262,7 +297,7 @@ export default function AbelleStudios() {
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{ padding: "64px 24px 48px", maxWidth: 1100, margin: "0 auto" }}>
+      <section className="section-wrap" style={{ padding: "64px 24px 48px", maxWidth: 1100, margin: "0 auto" }}>
         <div className="hero-grid" style={{ display: "flex", gap: 40, alignItems: "center" }}>
           {/* Left */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -288,7 +323,7 @@ export default function AbelleStudios() {
           </div>
 
           {/* Right — Polaroid collage */}
-          <div style={{
+          <div className="hero-polaroids" style={{
             flex: "0 0 auto", width: 280,
             display: "flex", flexWrap: "wrap", gap: 10,
             justifyContent: "center", alignItems: "flex-start",
@@ -442,7 +477,7 @@ export default function AbelleStudios() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <div className="contact-btns" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 <button className="btn-primary" onClick={openMessenger}>Message on Messenger</button>
                 <button className="btn-outline" onClick={openCall}>Call / Text Us</button>
                 <button className="btn-outline" onClick={openMaps}>Get Directions</button>
