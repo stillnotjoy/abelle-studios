@@ -279,7 +279,7 @@ function App() {
 
         <div className="package-grid">
           {packages.map((pkg) => (
-            <article className="package-card" key={pkg.id}>
+            <article className={`package-card package-${pkg.id}`} key={pkg.id}>
               <figure className="package-media">
                 <img src={pkg.image} alt={`${pkg.title} sample`} />
               </figure>
@@ -494,12 +494,12 @@ p { color: var(--muted); line-height: 1.75; }
 .hero-socials { display: flex; gap: 10px; margin-top: 22px; }
 .hero-socials a, .footer-socials a { width: 38px; height: 38px; border: 1px solid var(--faint); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); background: rgba(255,255,255,.35); transition: .2s ease; }
 .hero-socials a:hover, .footer-socials a:hover { transform: translateY(-2px); background: var(--paper); color: var(--gold-dark); }
-.hero-visual { position: relative; min-height: 560px; }
-.photo-stack { position: relative; height: 560px; }
+.hero-visual { position: relative; min-height: 620px; }
+.photo-stack { position: relative; height: 620px; }
 .photo-stack img { position: absolute; object-fit: cover; display: block; box-shadow: var(--shadow); background: var(--soft); }
-.photo-main { width: 70%; height: 88%; right: 0; top: 0; }
-.photo-small.top { width: 48%; height: 32%; left: 0; top: 44px; }
-.photo-small.bottom { width: 52%; height: 34%; left: 12%; bottom: 0; }
+.photo-main { width: 62%; height: 88%; right: 0; top: 0; object-position: center 30%; }
+.photo-small.top { width: 42%; aspect-ratio: 3 / 4; height: auto; left: 0; top: 34px; object-position: center 16%; }
+.photo-small.bottom { width: 46%; aspect-ratio: 4 / 3; height: auto; left: 10%; bottom: 0; object-position: center; }
 
 .studio-strip { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--faint); border-bottom: 1px solid var(--faint); }
 .studio-strip div { padding: 24px; border-right: 1px solid var(--faint); }
@@ -517,13 +517,15 @@ p { color: var(--muted); line-height: 1.75; }
 
 .package-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .package-card { background: var(--paper); border: 1px solid var(--faint); box-shadow: 0 12px 34px rgba(0,0,0,.045); display: grid; grid-template-rows: auto auto; overflow: hidden; }
-.package-media { margin: 0; background: var(--soft); overflow: hidden; aspect-ratio: 4 / 3; }
+.package-media { margin: 0; background: var(--soft); overflow: hidden; }
 .package-media img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
-.package-card:nth-child(1) .package-media img { object-position: center 32%; }
-.package-card:nth-child(2) .package-media img { object-position: center 24%; }
-.package-card:nth-child(3) .package-media img { object-position: center 45%; }
-.package-card:nth-child(4) .package-media img { object-position: center 42%; }
 .package-card:hover .package-media img { transform: scale(1.018); }
+.package-01 .package-media, .package-02 .package-media { aspect-ratio: 3 / 4; }
+.package-03 .package-media, .package-04 .package-media { aspect-ratio: 4 / 3; }
+.package-01 .package-media img { object-position: center 28%; }
+.package-02 .package-media img { object-position: center 18%; }
+.package-03 .package-media img { object-position: center 45%; }
+.package-04 .package-media img { object-position: center 42%; }
 .package-content { padding: 34px; display: flex; flex-direction: column; min-height: 580px; }
 .package-topline { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
 .package-topline span { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 56px; line-height: .8; color: rgba(0,0,0,.07); }
@@ -613,10 +615,11 @@ li::before { content: '—'; color: var(--gold); position: absolute; left: 0; }
   .btn, .social-link { width: 100%; }
   .hero-visual { min-height: auto; }
   .photo-stack { height: auto; display: grid; gap: 12px; }
-  .photo-stack img { position: static; width: 100% !important; height: auto !important; aspect-ratio: 4 / 5; }
-  .photo-small.top { display: none; }
+  .photo-stack img { position: static; width: 100% !important; height: auto !important; }
+  .photo-main, .photo-small.top, .photo-small.bottom { aspect-ratio: 3 / 4; }
   .services-intro, .packages-section, .why-section, .promo-section, .contact-section { padding: 46px 0; }
-  .package-media { aspect-ratio: 4 / 3; }
+  .package-01 .package-media, .package-02 .package-media { aspect-ratio: 3 / 4; }
+  .package-03 .package-media, .package-04 .package-media { aspect-ratio: 4 / 3; }
   .package-media img { height: 100%; object-fit: cover; }
   .package-content, .custom-card > div:not(.slideshow) { padding: 26px 22px; min-height: auto; }
   .package-footer { display: block; }
