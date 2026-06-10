@@ -21,7 +21,7 @@ const packages = [
     price: "₱499",
     inclusions: [
       "30–45 minute guided photoshoot",
-      "1 chosen portrait in A4 print with basic frame",
+      "1 chosen portrait in A4 print",
       "2 wallet-size copies",
       "Enhanced soft copies sent via email",
       "Professional studio background",
@@ -38,7 +38,7 @@ const packages = [
     price: "₱899",
     inclusions: [
       "30–45 minute guided photoshoot",
-      "1 chosen portrait in A4 print with basic frame",
+      "1 chosen portrait in A4 print",
       "2 4R copies",
       "2 wallet-size copies",
       "Enhanced soft copies sent via email",
@@ -58,7 +58,7 @@ const packages = [
       "Good for 3–4 people",
       "30–45 minute photoshoot",
       "Professional studio background and lighting",
-      "1 chosen shot in A4 print with basic frame",
+      "1 chosen shot in A4 print",
       "2 4R copies or 6 wallet-size copies",
       "Soft copies sent via email",
     ],
@@ -73,7 +73,7 @@ const packages = [
     inclusions: [
       "Good for 5–6 people",
       "45–60 minute photoshoot",
-      "2 chosen portraits in A4 print with basic frame",
+      "2 chosen portraits in A4 print",
       "2 4R copies",
       "2 wallet-size copies",
       "Soft copies sent via email",
