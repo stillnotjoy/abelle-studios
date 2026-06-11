@@ -34,18 +34,30 @@ export default async function handler(request, response) {
       });
     }
 
-    const bookingPayload = {
-      secret: appsScriptSecret,
-      name: metadata.name,
-      email: metadata.email,
-      phone: metadata.phone,
-      packageTitle: metadata.packageTitle,
-      date: metadata.date,
-      time: metadata.time,
-      totalToPayNow: metadata.totalToPayNow,
-      remainingBalance: metadata.remainingBalance,
-      notes: metadata.notes || "",
-    };
+   const bookingPayload = {
+  secret: appsScriptSecret,
+
+  name: metadata.name,
+  email: metadata.email,
+  phone: metadata.phone,
+
+  packageTitle: metadata.packageTitle,
+  packagePrice: metadata.packagePrice,
+  amountDueToday: metadata.amountDueToday,
+  onlineFee: metadata.onlineFee,
+  totalToPayNow: metadata.totalToPayNow,
+  remainingBalance: metadata.remainingBalance,
+
+  date: metadata.date,
+  time: metadata.time,
+  notes: metadata.notes || "",
+
+  paymongoReference:
+    checkoutSession?.id ||
+    checkoutAttributes?.reference_number ||
+    checkoutAttributes?.payment_intent?.id ||
+    "",
+};
 
     console.log("SENDING BOOKING TO GOOGLE CALENDAR:", bookingPayload);
 
