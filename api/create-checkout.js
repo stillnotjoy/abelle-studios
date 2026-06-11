@@ -57,8 +57,8 @@ export default async function handler(request, response) {
               show_line_items: true,
               description: `Abelle Studios booking for ${name}`,
               payment_method_types: ["card", "gcash", "paymaya"],
-              success_url: `${siteUrl}/?payment=success`,
-              cancel_url: `${siteUrl}/?payment=cancelled`,
+              success_url: `${siteUrl}/?booking=success`,
+cancel_url: `${siteUrl}/?booking=cancelled`,
               line_items: [
                 {
                   currency: "PHP",
