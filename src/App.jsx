@@ -235,6 +235,11 @@ function SocialIcon({ type, size = 17 }) {
 }
 
 function App() {
+  const bookingStatus =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("booking")
+      : null;
+
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     packageId: bookingPackages[0].id,
@@ -375,6 +380,73 @@ useEffect(() => {
     alert(`Checkout error: ${error.message}`);
   }
 };
+
+  if (bookingStatus === "success") {
+    return (
+      <main className="site">
+        <style>{css}</style>
+
+        <section className="thank-you-page">
+          <div className="thank-you-card">
+            <p className="eyebrow">Booking Confirmed</p>
+            <h1>Thank you for booking with Abelle Studios.</h1>
+            <p>
+              Your payment has been received and your shoot is now confirmed.
+              Please check your email for the full booking details and calendar
+              options.
+            </p>
+
+            <div className="thank-you-actions">
+              <a className="btn btn-dark" href="/">
+                Back to Home
+              </a>
+              <a
+                className="btn btn-outline"
+                href="https://m.me/254698671071327"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Message Us
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (bookingStatus === "cancelled") {
+    return (
+      <main className="site">
+        <style>{css}</style>
+
+        <section className="thank-you-page">
+          <div className="thank-you-card">
+            <p className="eyebrow">Payment Cancelled</p>
+            <h1>Your booking was not completed.</h1>
+            <p>
+              No worries. Your slot has not been confirmed yet. You may go back
+              and try again when ready.
+            </p>
+
+            <div className="thank-you-actions">
+              <a className="btn btn-dark" href="/">
+                Try Again
+              </a>
+              <a
+                className="btn btn-outline"
+                href="https://m.me/254698671071327"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Message Us
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="site">
@@ -1713,7 +1785,43 @@ li::before {
   font-size: 12px;
   margin: -3px 0 0;
 }
+.thank-you-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+  background:
+    radial-gradient(circle at top left, rgba(201,169,110,.18), transparent 32%),
+    linear-gradient(180deg, #f4f2ef 0%, #eee9e2 100%);
+}
 
+.thank-you-card {
+  width: min(760px, 100%);
+  background: var(--paper);
+  border: 1px solid var(--faint);
+  box-shadow: var(--shadow);
+  padding: clamp(34px, 6vw, 72px);
+  text-align: center;
+}
+
+.thank-you-card h1 {
+  font-size: clamp(44px, 7vw, 82px);
+  line-height: .95;
+  max-width: none;
+}
+
+.thank-you-card p {
+  max-width: 560px;
+  margin: 24px auto 0;
+}
+
+.thank-you-actions {
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 @media (max-width: 980px) {
   .hero,
 .contact-layout {
