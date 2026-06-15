@@ -358,8 +358,7 @@ useEffect(() => {
       notes: bookingForm.notes,
     };
 
-    const response = await fetch("/api/create-checkout", {
-      method: "POST",
+const response = await fetch("/api/create-booking-request", {      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -374,13 +373,56 @@ useEffect(() => {
       return;
     }
 
-    window.location.href = data.checkoutUrl;
+    window.location.href = `/?booking=requested&ref=${data.bookingReference}`;
     } catch (error) {
     console.error("Frontend checkout error:", error);
     alert(`Checkout error: ${error.message}`);
   }
 };
+if (bookingStatus === "requested") {
+  const bookingReference =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("ref")
+      : "";
 
+  return (
+    <main className="site">
+      <style>{css}</style>
+
+      <section className="thank-you-page">
+        <div className="thank-you-card">
+          <p className="eyebrow">Booking Request Received</p>
+          <h1>Thank you. We received your booking request.</h1>
+          <p>
+            Your preferred slot has been submitted for review. We’ll send our
+            GCash payment details shortly. Your booking is confirmed only once
+            payment has been received.
+          </p>
+
+          {bookingReference && (
+            <p>
+              <strong>Reference:</strong> {bookingReference}
+            </p>
+          )}
+
+          <div className="thank-you-actions">
+            <a className="btn btn-dark" href="/">
+              Back to Home
+            </a>
+            <a
+              className="btn btn-outline"
+              href="https://m.me/254698671071327"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Message Us
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
   if (bookingStatus === "success") {
     return (
       <main className="site">
@@ -876,15 +918,15 @@ useEffect(() => {
                   <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
                 </div>
 
-                <div>
-                  <span>Online payment fee</span>
-                  <strong>₱{paymentSummary.onlineFee.toLocaleString()}</strong>
-                </div>
+               <div>
+  <span>Payment method</span>
+  <strong>GCash manual payment</strong>
+</div>
 
-                <div className="drawer-payment-total">
-                  <span>Total to pay now</span>
-                  <strong>₱{paymentSummary.totalToPayNow.toLocaleString()}</strong>
-                </div>
+<div className="drawer-payment-total">
+  <span>Amount to settle today</span>
+  <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
+</div>
 
                 <div>
                   <span>Remaining balance</span>
@@ -893,13 +935,13 @@ useEffect(() => {
               </div>
 
               <button className="btn btn-dark full" disabled={!bookingForm.time}>
-                Continue to Payment
-              </button>
+Submit Booking Request              </button>
 
               <p className="drawer-small-note">
-                Your slot is reserved once payment is received. Online payment
-                fees are shown clearly before checkout.
-              </p>
+  Your booking request will be reviewed first. We’ll send our GCash
+  QR or number after checking your preferred schedule. Your slot is
+  confirmed once payment is received.
+</p>
             </form>
           </aside>
         </div>
