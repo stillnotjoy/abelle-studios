@@ -7,6 +7,32 @@ const PACKAGE_PRICES = {
   "Family Portrait": 1299,
 };
 
+async function saveCheckoutAttempt(attempt) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.error("Supabase env vars missing. Checkout attempt was not saved.");
+    return;
+  }
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/checkout_attempts`, {
+    method: "POST",
+    headers: {
+      apikey: supabaseServiceRoleKey,
+      Authorization: `Bearer ${supabaseServiceRoleKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(attempt),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Supabase checkout attempt save error:", errorText);
+  }
+}
+
 function getBookingReference(date, time) {
   const cleanDate = String(date || "").replaceAll("-", "");
   const cleanTime = String(time || "").replace(":", "");
@@ -129,13 +155,39 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({
-      bookingReference,
-      checkoutSessionId: data.data.id,
-      checkoutUrl: data.data.attributes.checkout_url,
-      amountToPay: paymentDetails.amount,
-      remainingBalance: paymentDetails.remainingBalance,
-    });
+    const checkoutSessionId = data.data.id;
+const checkoutUrl = data.data.attributes.checkout_url;
+
+await saveCheckoutAttempt({
+  booking_reference: bookingReference,
+  checkout_session_id: checkoutSessionId,
+  checkout_url: checkoutUrl,
+  status: "STARTED",
+
+  client_name: name,
+  email,
+  phone,
+
+  package_title: packageTitle,
+  shoot_date: date,
+  shoot_time: time,
+
+  payment_option: paymentOption,
+  package_price: PACKAGE_PRICES[packageTitle],
+  amount_to_pay: paymentDetails.amount,
+  remaining_balance: paymentDetails.remainingBalance,
+
+  notes: req.body?.notes || "",
+});
+
+return res.status(200).json({
+  bookingReference,
+  checkoutSessionId,
+  checkoutUrl,
+  amountToPay: paymentDetails.amount,
+  remainingBalance: paymentDetails.remainingBalance,
+});
+
   } catch (error) {
     console.error("Create checkout error:", error);
     return res.status(500).json({

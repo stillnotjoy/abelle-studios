@@ -153,18 +153,19 @@ function pesoToNumber(price) {
   return Number(String(price).replace(/[^\d]/g, ""));
 }
 
-function calculateBookingPayment(packagePrice) {
-  const amountDueToday =
-    packagePrice <= 500 ? packagePrice : Math.ceil(packagePrice * 0.5);
+function calculateBookingPayment(packagePrice, paymentOption) {
+  const isFullOnline = paymentOption === "full_online";
 
-  const onlineFee = Math.ceil(amountDueToday * 0.03125 + 13.39);
-  const totalToPayNow = amountDueToday + onlineFee;
+  const amountDueToday = isFullOnline
+    ? packagePrice
+    : packagePrice <= 500
+      ? packagePrice
+      : Math.ceil(packagePrice * 0.5);
+
   const remainingBalance = packagePrice - amountDueToday;
 
   return {
     amountDueToday,
-    onlineFee,
-    totalToPayNow,
     remainingBalance,
   };
 }
@@ -250,6 +251,7 @@ function App() {
     email: "",
     notes: "",
   });
+  const [paymentOption, setPaymentOption] = useState("dp_gcash_balance_instudio");
   const [bookedTimes, setBookedTimes] = useState([]);
 const [isCheckingSlots, setIsCheckingSlots] = useState(false);
 
@@ -258,7 +260,20 @@ const [isCheckingSlots, setIsCheckingSlots] = useState(false);
     bookingPackages[0];
 
   const selectedPackagePrice = pesoToNumber(selectedBookingPackage.price);
-  const paymentSummary = calculateBookingPayment(selectedPackagePrice);
+  const paymentSummary = calculateBookingPayment(selectedPackagePrice, paymentOption);
+
+  const fullPaymentAmount = selectedPackagePrice;
+
+const dpAmount =
+  selectedPackagePrice <= 500
+    ? selectedPackagePrice
+    : Math.ceil(selectedPackagePrice * 0.5);
+
+const amountToPayNow =
+  paymentOption === "full_online" ? fullPaymentAmount : dpAmount;
+
+const remainingBalance =
+  paymentOption === "full_online" ? 0 : selectedPackagePrice - dpAmount;
 
  const availableSlots = useMemo(() => {
   if (!bookingForm.date) return [];
@@ -333,8 +348,7 @@ useEffect(() => {
 
     setIsBookingOpen(true);
   };
-
- const submitBookingPreview = async (event) => {
+const submitBookingPreview = async (event) => {
   event.preventDefault();
 
   if (!bookingForm.time) {
@@ -343,12 +357,10 @@ useEffect(() => {
   }
 
   try {
-    const paymentPayload = {
+    const basePayload = {
       packageTitle: selectedBookingPackage.title,
       packagePrice: selectedPackagePrice,
       amountDueToday: paymentSummary.amountDueToday,
-      onlineFee: paymentSummary.onlineFee,
-      totalToPayNow: paymentSummary.totalToPayNow,
       remainingBalance: paymentSummary.remainingBalance,
       date: bookingForm.date,
       time: bookingForm.time,
@@ -356,25 +368,63 @@ useEffect(() => {
       phone: bookingForm.phone,
       email: bookingForm.email,
       notes: bookingForm.notes,
+      paymentOption,
     };
 
-const response = await fetch("/api/create-booking-request", {      method: "POST",
+    if (paymentOption === "full_online") {
+      const response = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(basePayload),
+      });
+
+      const responseText = await response.text();
+
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (error) {
+        console.error("Non-JSON API response:", responseText);
+        throw new Error("The checkout API did not return a valid response.");
+      }
+
+      if (!response.ok) {
+        console.error("Checkout API error:", data);
+        throw new Error(data.error || "Unable to create checkout.");
+      }
+
+      if (!data.checkoutUrl) {
+        console.error("Missing checkoutUrl:", data);
+        throw new Error("Checkout link was not created.");
+      }
+
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+
+    const response = await fetch("/api/create-booking-request", {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(paymentPayload),
+      body: JSON.stringify({
+        ...basePayload,
+        paymentOption: "dp_gcash_balance_instudio",
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
       console.error(data);
-      alert("Sorry, we could not start the payment. Please try again.");
+      alert("Sorry, we could not submit your booking request. Please try again.");
       return;
     }
 
     window.location.href = `/?booking=requested&ref=${data.bookingReference}`;
-    } catch (error) {
+  } catch (error) {
     console.error("Frontend checkout error:", error);
     alert(`Checkout error: ${error.message}`);
   }
@@ -912,35 +962,100 @@ if (bookingStatus === "requested") {
                 />
               </label>
 
+              <div className="drawer-field">
+  <span className="drawer-field-title">Choose your payment option</span>
+
+  <div className="payment-options">
+    <label
+      className={
+        paymentOption === "full_online"
+          ? "payment-option-card active"
+          : "payment-option-card"
+      }
+    >
+      <input
+        type="radio"
+        name="paymentOption"
+        value="full_online"
+        checked={paymentOption === "full_online"}
+        onChange={(event) => setPaymentOption(event.target.value)}
+      />
+      <span>
+        <strong>Pay in full online</strong>
+        <small>
+          Pay the full package amount through PayMongo. Online processing fees
+          are added at checkout. Your booking is automatically confirmed once
+          payment is completed.
+        </small>
+      </span>
+    </label>
+
+    <label
+      className={
+        paymentOption === "dp_gcash_balance_instudio"
+          ? "payment-option-card active"
+          : "payment-option-card"
+      }
+    >
+      <input
+        type="radio"
+        name="paymentOption"
+        value="dp_gcash_balance_instudio"
+        checked={paymentOption === "dp_gcash_balance_instudio"}
+        onChange={(event) => setPaymentOption(event.target.value)}
+      />
+      <span>
+        <strong>50% down payment via GCash</strong>
+        <small>
+          Receive our GCash details by email. Please send your proof of payment
+          to Messenger so we can manually confirm your booking. The remaining
+          balance is payable in-studio.
+        </small>
+      </span>
+    </label>
+  </div>
+</div>
+
               <div className="drawer-payment-preview">
-                <div>
-                  <span>Amount due today</span>
-                  <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
-                </div>
+  <div>
+    <span>Package price</span>
+    <strong>₱{selectedPackagePrice.toLocaleString()}</strong>
+  </div>
 
-               <div>
-  <span>Payment method</span>
-  <strong>GCash manual payment</strong>
+  <div>
+    <span>Payment method</span>
+    <strong>
+      {paymentOption === "full_online"
+        ? "PayMongo full online payment"
+        : "GCash down payment"}
+    </strong>
+  </div>
+
+  <div className="drawer-payment-total">
+    <span>
+      {paymentOption === "full_online"
+        ? "Full payment now"
+        : "Down payment now"}
+    </span>
+    <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
+  </div>
+
+  <div>
+    <span>Remaining balance</span>
+    <strong>₱{paymentSummary.remainingBalance.toLocaleString()}</strong>
+  </div>
 </div>
 
-<div className="drawer-payment-total">
-  <span>Amount to settle today</span>
-  <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
-</div>
-
-                <div>
-                  <span>Remaining balance</span>
-                  <strong>₱{paymentSummary.remainingBalance.toLocaleString()}</strong>
-                </div>
-              </div>
-
-              <button className="btn btn-dark full" disabled={!bookingForm.time}>
-Submit Booking Request              </button>
+             <button className="btn btn-dark full" disabled={!bookingForm.time}>
+  {paymentOption === "full_online"
+    ? "Continue to PayMongo Checkout"
+    : "Submit Booking Request"}
+</button>
 
               <p className="drawer-small-note">
-  Your booking request will be reviewed first. We’ll send our GCash
-  QR or number after checking your preferred schedule. Your slot is
-  confirmed once payment is received.
+  {paymentOption === "full_online"
+    ? "You will be redirected to our secure PayMongo checkout page. Online processing fees are added at checkout."
+    : "We’ll email the GCash payment details after receiving your request. Please send proof of payment through Messenger so we can manually confirm your booking."}
 </p>
             </form>
           </aside>
@@ -1786,6 +1901,73 @@ li::before {
   background: var(--dark);
   color: var(--bg);
   border-color: var(--dark);
+}
+
+.drawer-field {
+  display: grid;
+  gap: 8px;
+}
+
+.drawer-field-title {
+  color: var(--gold-dark);
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.payment-options {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-option-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 15px;
+  border: 1px solid rgba(17,17,17,.12);
+  background: #fff;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.payment-option-card:hover {
+  border-color: rgba(201,169,110,.72);
+  transform: translateY(-1px);
+}
+
+.payment-option-card.active {
+  border-color: var(--gold);
+  background: #fcf8f1;
+  box-shadow: 0 10px 24px rgba(0,0,0,.05);
+}
+
+.payment-option-card input {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 3px;
+  accent-color: var(--gold-dark);
+}
+
+.payment-option-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.payment-option-card small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .drawer-payment-preview {
