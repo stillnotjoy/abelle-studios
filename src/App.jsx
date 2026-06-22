@@ -252,6 +252,7 @@ function App() {
     notes: "",
   });
   const [paymentOption, setPaymentOption] = useState("dp_gcash_balance_instudio");
+  const [discountCode, setDiscountCode] = useState("");
   const [bookedTimes, setBookedTimes] = useState([]);
 const [isCheckingSlots, setIsCheckingSlots] = useState(false);
 
@@ -260,7 +261,27 @@ const [isCheckingSlots, setIsCheckingSlots] = useState(false);
     bookingPackages[0];
 
   const selectedPackagePrice = pesoToNumber(selectedBookingPackage.price);
-  const paymentSummary = calculateBookingPayment(selectedPackagePrice, paymentOption);
+  const rawPaymentSummary = calculateBookingPayment(selectedPackagePrice, paymentOption);
+
+const normalAmountDueToday = rawPaymentSummary.amountDueToday;
+
+const DISCOUNT_CODE = "ABELLE100";
+const DISCOUNT_AMOUNT = 100;
+
+const hasDiscount =
+  paymentOption === "full_online" &&
+  discountCode.trim().toUpperCase() === DISCOUNT_CODE;
+
+const discountedAmountDueToday = hasDiscount
+  ? Math.max(rawPaymentSummary.amountDueToday - DISCOUNT_AMOUNT, 0)
+  : rawPaymentSummary.amountDueToday;
+
+const paymentSummary = {
+  ...rawPaymentSummary,
+  amountDueToday: discountedAmountDueToday,
+  discountCode: hasDiscount ? DISCOUNT_CODE : "",
+  discountAmount: hasDiscount ? DISCOUNT_AMOUNT : 0,
+};
 
   const fullPaymentAmount = selectedPackagePrice;
 
@@ -369,6 +390,8 @@ const submitBookingPreview = async (event) => {
       email: bookingForm.email,
       notes: bookingForm.notes,
       paymentOption,
+      discountCode: paymentSummary.discountCode,
+      discountAmount: paymentSummary.discountAmount,
     };
 
     if (paymentOption === "full_online") {
@@ -1014,6 +1037,27 @@ if (bookingStatus === "requested") {
       </span>
     </label>
   </div>
+
+  {paymentOption === "full_online" && (
+    <div className="discount-code-box">
+      <label htmlFor="discountCode">Discount Code</label>
+      <input
+        id="discountCode"
+        type="text"
+        value={discountCode}
+        onChange={(event) => setDiscountCode(event.target.value)}
+        placeholder="Enter discount code"
+      />
+
+      {discountCode.trim() && (
+        <p className={hasDiscount ? "discount-valid" : "discount-invalid"}>
+          {hasDiscount
+  ? "Discount applied. ₱100 off your booking."
+  : "Discount code not applied."}
+        </p>
+      )}
+    </div>
+  )}
 </div>
 
               <div className="drawer-payment-preview">
@@ -1021,6 +1065,13 @@ if (bookingStatus === "requested") {
     <span>Package price</span>
     <strong>₱{selectedPackagePrice.toLocaleString()}</strong>
   </div>
+
+  {paymentSummary.discountAmount > 0 && (
+    <div>
+      <span>Discount applied</span>
+      <strong>-₱{paymentSummary.discountAmount.toLocaleString()}</strong>
+    </div>
+  )}
 
   <div>
     <span>Payment method</span>
@@ -1968,6 +2019,43 @@ li::before {
   line-height: 1.45;
   text-transform: none;
   letter-spacing: normal;
+}
+
+.discount-code-box {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.discount-code-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.discount-code-box input {
+  width: 100%;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  outline: none;
+  background: #fff;
+  color: #111;
+}
+
+.discount-valid {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #166534;
+}
+
+.discount-invalid {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #991b1b;
 }
 
 .drawer-payment-preview {
