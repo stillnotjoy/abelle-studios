@@ -1,58 +1,268 @@
+const SUPABASE_URL = process.env.SUPABASE_URL;
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function sendJson(response, status, data) {
+  return response.status(status).json(data);
+}
+
+function cleanText(value) {
+  return String(value || "").trim();
+}
+
+async function getPackageFromSupabase(packageId) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      "Supabase environment variables are missing."
+    );
+  }
+
+  const encodedPackageId = encodeURIComponent(packageId);
+
+  const url =
+    `${SUPABASE_URL}/rest/v1/abelle_packages` +
+    `?select=id,name,description,default_price,default_deposit,duration_minutes,is_active` +
+    `&id=eq.${encodedPackageId}` +
+    `&limit=1`;
+
+  const supabaseResponse = await fetch(url, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const responseText = await supabaseResponse.text();
+
+  let data = null;
+
+  try {
+    data = responseText
+      ? JSON.parse(responseText)
+      : null;
+  } catch {
+    data = responseText;
+  }
+
+  if (!supabaseResponse.ok) {
+    console.error(
+      "Supabase package lookup failed:",
+      data
+    );
+
+    throw new Error(
+      typeof data === "object" && data?.message
+        ? data.message
+        : "Could not retrieve the selected package."
+    );
+  }
+
+  return Array.isArray(data) ? data[0] || null : null;
+}
+
 export default async function handler(request, response) {
   if (request.method !== "POST") {
-    return response.status(405).json({ error: "Method not allowed" });
+    return sendJson(response, 405, {
+      error: "Method not allowed.",
+    });
   }
 
   try {
-    const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
-    const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+    const appsScriptUrl =
+      process.env.GOOGLE_APPS_SCRIPT_URL;
+
+    const appsScriptSecret =
+      process.env.GOOGLE_APPS_SCRIPT_SECRET;
 
     if (!appsScriptUrl || !appsScriptSecret) {
-      return response.status(500).json({
-        error: "Missing Apps Script environment variables.",
+      return sendJson(response, 500, {
+        error:
+          "Missing Apps Script environment variables.",
       });
     }
+
+    const body = request.body || {};
+
+    const packageId = cleanText(body.packageId);
+    const date = cleanText(body.date);
+    const time = cleanText(body.time);
+    const customerName = cleanText(body.name);
+    const phone = cleanText(body.phone);
+    const email = cleanText(body.email);
+    const notes = cleanText(body.notes);
+
+    if (!packageId) {
+      return sendJson(response, 400, {
+        error: "Please select a studio package.",
+      });
+    }
+
+    if (
+      !date ||
+      !time ||
+      !customerName ||
+      !phone ||
+      !email
+    ) {
+      return sendJson(response, 400, {
+        error:
+          "Please complete all required booking details.",
+      });
+    }
+
+    const selectedPackage =
+      await getPackageFromSupabase(packageId);
+
+    if (!selectedPackage) {
+      return sendJson(response, 404, {
+        error:
+          "The selected package could not be found.",
+      });
+    }
+
+    if (!selectedPackage.is_active) {
+      return sendJson(response, 409, {
+        error:
+          "This package is no longer available for booking. Please choose another package.",
+      });
+    }
+
+    const packagePrice = Number(
+      selectedPackage.default_price
+    );
+
+    const packageDeposit = Number(
+      selectedPackage.default_deposit || 0
+    );
+
+    const durationMinutes = Number(
+      selectedPackage.duration_minutes || 60
+    );
+
+    if (
+      !Number.isFinite(packagePrice) ||
+      packagePrice < 0
+    ) {
+      return sendJson(response, 500, {
+        error:
+          "The selected package has an invalid price.",
+      });
+    }
+
+    if (
+      !Number.isFinite(packageDeposit) ||
+      packageDeposit < 0
+    ) {
+      return sendJson(response, 500, {
+        error:
+          "The selected package has an invalid deposit.",
+      });
+    }
+
+    if (packageDeposit > packagePrice) {
+      return sendJson(response, 500, {
+        error:
+          "The package deposit cannot be higher than the package price.",
+      });
+    }
+
+    const amountDueToday = packageDeposit;
+
+    const remainingBalance = Math.max(
+      packagePrice - amountDueToday,
+      0
+    );
 
     const bookingPayload = {
       secret: appsScriptSecret,
       action: "create_pending_booking",
-      ...request.body,
+
+      packageId: selectedPackage.id,
+      packageTitle: selectedPackage.name,
+      packageDescription:
+        selectedPackage.description || "",
+      packagePrice,
+      packageDeposit,
+      durationMinutes,
+
+      amountDueToday,
+      remainingBalance,
+
+      date,
+      time,
+      name: customerName,
+      phone,
+      email,
+      notes,
+
+      paymentOption:
+        "dp_gcash_balance_instudio",
+
+      discountCode: "",
+      discountAmount: 0,
     };
 
-    const appsScriptResponse = await fetch(appsScriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(bookingPayload),
-    });
+    const appsScriptResponse = await fetch(
+      appsScriptUrl,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bookingPayload),
+      }
+    );
 
-    const text = await appsScriptResponse.text();
+    const responseText =
+      await appsScriptResponse.text();
 
     let data;
 
     try {
-      data = JSON.parse(text);
+      data = responseText
+        ? JSON.parse(responseText)
+        : {};
     } catch {
-      return response.status(500).json({
-        error: "Could not read Apps Script response.",
-        details: text,
+      console.error(
+        "Apps Script returned non-JSON:",
+        responseText
+      );
+
+      return sendJson(response, 500, {
+        error:
+          "Could not read Apps Script response.",
       });
     }
 
-    if (!data.ok) {
-      return response.status(500).json({
-        error: "Could not save booking request.",
+    if (!appsScriptResponse.ok || !data.ok) {
+      console.error(
+        "Apps Script booking error:",
+        data
+      );
+
+      return sendJson(response, 500, {
+        error:
+          data.error ||
+          "Could not save booking request.",
         details: data,
       });
     }
 
-    return response.status(200).json(data);
+    return sendJson(response, 200, data);
   } catch (error) {
-    console.error("Booking request error:", error);
+    console.error(
+      "Booking request error:",
+      error
+    );
 
-    return response.status(500).json({
-      error: "Something went wrong while saving booking request.",
+    return sendJson(response, 500, {
+      error:
+        error.message ||
+        "Something went wrong while saving the booking request.",
     });
   }
 }

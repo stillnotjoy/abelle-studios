@@ -1,4 +1,6 @@
+import Admin from "./Admin.jsx";
 import { useEffect, useMemo, useState } from "react";
+import { Routes, Route } from "react-router-dom";
 
 const messengerLink = "https://m.me/254698671071327";
 const phoneNumber = "+63 993 009 4179";
@@ -29,77 +31,7 @@ const socialLinks = [
   },
 ];
 
-const packages = [
-  {
-    id: "01",
-    title: "Personal Portraits",
-    tag: "Solo Session",
-    desc: "Perfect for solo portraits, creative portraits, professional photos, or simply capturing your own moment.",
-    image: "/assets/personal.jpg",
-    price: "₱499",
-    inclusions: [
-      "30–45 minute guided photoshoot",
-      "1 chosen portrait in A4 print",
-      "2 wallet-size copies",
-      "Enhanced soft copies sent via email",
-      "Professional studio background",
-      "Professional makeup and styling available",
-      "Costume of choice available by request",
-    ],
-  },
-  {
-    id: "02",
-    title: "Duo Portraits",
-    tag: "Two’s Company",
-    desc: "Perfect for couples, best friends, siblings, or two-person studio portraits.",
-    image: "/assets/duo.jpg",
-    price: "₱899",
-    inclusions: [
-      "30–45 minute guided photoshoot",
-      "1 chosen portrait in A4 print",
-      "2 4R copies",
-      "2 wallet-size copies",
-      "Enhanced soft copies sent via email",
-      "Professional studio background",
-      "Professional makeup and styling available",
-      "Costume of choice available by request",
-    ],
-  },
-  {
-    id: "03",
-    title: "Barkada Shoot",
-    tag: "Squad Goals",
-    desc: "Perfect for birthdays, school friends, barkada memories, or fun studio moments with friends.",
-    image: "/assets/barkada.jpg",
-    price: "₱999",
-    inclusions: [
-      "Good for 3–4 people",
-      "30–45 minute photoshoot",
-      "Professional studio background and lighting",
-      "1 chosen shot in A4 print",
-      "2 4R copies or 6 wallet-size copies",
-      "Soft copies sent via email",
-    ],
-  },
-  {
-    id: "04",
-    title: "Family Portrait",
-    tag: "Together",
-    desc: "Ideal for family gatherings, birthdays, holidays, milestones, or simply capturing a special moment with loved ones.",
-    image: "/assets/family.jpg",
-    price: "₱1,299",
-    inclusions: [
-      "Good for 5–6 people",
-      "45–60 minute photoshoot",
-      "2 chosen portraits in A4 print",
-      "2 4R copies",
-      "2 wallet-size copies",
-      "Soft copies sent via email",
-      "Professional studio background",
-      "Photo album available by request",
-    ],
-  },
-];
+
 
 const services = [
   "Family Portraits",
@@ -115,7 +47,6 @@ const services = [
   "Rush ID Photos 2×2 & 1×1",
   "Special Event? Ask us!",
 ];
-
 
 const whyUs = [
   "Affordable packages",
@@ -136,33 +67,117 @@ const slideshowPhotos = [
 
 const bookingSlots = [
   { label: "9:00 AM", value: "09:00" },
+  { label: "10:00 AM", value: "10:00" },
   { label: "11:00 AM", value: "11:00" },
+  { label: "12:00 PM", value: "12:00" },
   { label: "1:00 PM", value: "13:00" },
+  { label: "2:00 PM", value: "14:00" },
   { label: "3:00 PM", value: "15:00" },
+  { label: "4:00 PM", value: "16:00" },
   { label: "5:00 PM", value: "17:00" },
 ];
 
-const bookingPackages = packages.map((pkg) => ({
-  id: pkg.id,
-  title: pkg.title,
-  price: pkg.price,
-  desc: pkg.desc,
-}));
+function formatPackagePrice(value) {
+  const amount = Number(value || 0);
+
+  return `₱${amount.toLocaleString("en-PH")}`;
+}
+
+function parsePackageInclusions(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) =>
+      item
+        .replace(/^[-•]\s*/, "")
+        .trim()
+    )
+    .filter(Boolean);
+}
+
+function getPackageImagePosition(packageName) {
+  const name = String(packageName || "").toLowerCase();
+
+  if (
+    name.includes("personal") ||
+    name.includes("solo")
+  ) {
+    return "center 30%";
+  }
+
+  if (
+    name.includes("duo") ||
+    name.includes("couple")
+  ) {
+    return "center 28%";
+  }
+
+  if (name.includes("barkada")) {
+    return "center 40%";
+  }
+
+  if (name.includes("family")) {
+    return "center 38%";
+  }
+
+  return "center 35%";
+}
+
+function mapPublicPackage(pkg, index) {
+  const duration = Number(pkg.duration_minutes || 0);
+
+  return {
+    id: String(pkg.id),
+    displayNumber: String(index + 1).padStart(2, "0"),
+    title: pkg.name || "Studio Package",
+    tag: duration
+      ? `${duration} Minute Session`
+      : "Studio Session",
+    desc: pkg.description || "",
+    image: pkg.image_url || "/assets/personal.jpg",
+imagePosition: getPackageImagePosition(pkg.name),
+price: formatPackagePrice(pkg.default_price),
+    priceValue: Number(pkg.default_price || 0),
+    depositValue: Number(pkg.default_deposit || 0),
+    durationMinutes: duration,
+    inclusions: parsePackageInclusions(pkg.inclusions),
+    color: pkg.color || "#c9a96e",
+  };
+}
 
 function pesoToNumber(price) {
   return Number(String(price).replace(/[^\d]/g, ""));
 }
 
-function calculateBookingPayment(packagePrice, paymentOption) {
-  const isFullOnline = paymentOption === "full_online";
+function calculateBookingPayment(
+  packagePrice,
+  packageDeposit,
+  paymentOption
+) {
+  const safePrice = Math.max(
+    Number(packagePrice || 0),
+    0
+  );
+
+  const safeDeposit = Math.min(
+    Math.max(Number(packageDeposit || 0), 0),
+    safePrice
+  );
+
+  const isFullOnline =
+    paymentOption === "full_online";
 
   const amountDueToday = isFullOnline
-    ? packagePrice
-    : packagePrice <= 500
-      ? packagePrice
-      : Math.ceil(packagePrice * 0.5);
+    ? safePrice
+    : safeDeposit;
 
-  const remainingBalance = packagePrice - amountDueToday;
+  const remainingBalance = Math.max(
+    safePrice - amountDueToday,
+    0
+  );
 
   return {
     amountDueToday,
@@ -235,15 +250,19 @@ function SocialIcon({ type, size = 17 }) {
   }
 }
 
-function App() {
+function PublicWebsite() {
+ 
+
   const bookingStatus =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("booking")
       : null;
-
+const [packages, setPackages] = useState([]);
+const [packagesLoading, setPackagesLoading] = useState(true);
+const [packagesError, setPackagesError] = useState("");
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingForm, setBookingForm] = useState({
-    packageId: bookingPackages[0].id,
+    packageId: "",
     date: "",
     time: "",
     name: "",
@@ -252,101 +271,224 @@ function App() {
     notes: "",
   });
   const [paymentOption, setPaymentOption] = useState("dp_gcash_balance_instudio");
-  const [discountCode, setDiscountCode] = useState("");
   const [bookedTimes, setBookedTimes] = useState([]);
-const [isCheckingSlots, setIsCheckingSlots] = useState(false);
+  const [isCheckingSlots, setIsCheckingSlots] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [validatedDiscount, setValidatedDiscount] = useState(null);
+  const [discountMessage, setDiscountMessage] = useState("");
+  const [isCheckingDiscount, setIsCheckingDiscount] = useState(false);
 
-  const selectedBookingPackage =
-    bookingPackages.find((pkg) => pkg.id === bookingForm.packageId) ||
-    bookingPackages[0];
-
-  const selectedPackagePrice = pesoToNumber(selectedBookingPackage.price);
-  const rawPaymentSummary = calculateBookingPayment(selectedPackagePrice, paymentOption);
-
-const normalAmountDueToday = rawPaymentSummary.amountDueToday;
-
-const DISCOUNT_CODE = "ABELLE100";
-const DISCOUNT_AMOUNT = 100;
-
-const hasDiscount =
-  paymentOption === "full_online" &&
-  discountCode.trim().toUpperCase() === DISCOUNT_CODE;
-
-const discountedAmountDueToday = hasDiscount
-  ? Math.max(rawPaymentSummary.amountDueToday - DISCOUNT_AMOUNT, 0)
-  : rawPaymentSummary.amountDueToday;
-
-const paymentSummary = {
-  ...rawPaymentSummary,
-  amountDueToday: discountedAmountDueToday,
-  discountCode: hasDiscount ? DISCOUNT_CODE : "",
-  discountAmount: hasDiscount ? DISCOUNT_AMOUNT : 0,
-};
-
-  const fullPaymentAmount = selectedPackagePrice;
-
-const dpAmount =
-  selectedPackagePrice <= 500
-    ? selectedPackagePrice
-    : Math.ceil(selectedPackagePrice * 0.5);
-
-const amountToPayNow =
-  paymentOption === "full_online" ? fullPaymentAmount : dpAmount;
-
-const remainingBalance =
-  paymentOption === "full_online" ? 0 : selectedPackagePrice - dpAmount;
-
- const availableSlots = useMemo(() => {
-  if (!bookingForm.date) return [];
-
-  return bookingSlots.filter(
-    (slot) => !bookedTimes.includes(slot.value)
-  );
-}, [bookingForm.date, bookedTimes]);
+const bookingPackages = useMemo(
+  () =>
+    packages.map((pkg) => ({
+      id: pkg.id,
+      title: pkg.title,
+      price: pkg.price,
+      priceValue: pkg.priceValue,
+      depositValue: pkg.depositValue,
+      desc: pkg.desc,
+    })),
+  [packages]
+);
 
 useEffect(() => {
-  if (!bookingForm.date) {
-    setBookedTimes([]);
-    return;
-  }
+  let isCancelled = false;
 
-  const checkAvailableSlots = async () => {
+  const loadPublicPackages = async () => {
     try {
-      setIsCheckingSlots(true);
+      setPackagesLoading(true);
+      setPackagesError("");
 
-      setBookingForm((current) => ({
-        ...current,
-        time: "",
-      }));
+      const response = await fetch("/api/packages");
+      const responseText = await response.text();
 
-      const response = await fetch(`/api/available-slots?date=${bookingForm.date}`);
-      const data = await response.json();
+      let data = {};
 
-      if (!response.ok) {
-        console.error(data);
-        setBookedTimes([]);
-        return;
+      try {
+        data = responseText
+          ? JSON.parse(responseText)
+          : {};
+      } catch {
+        throw new Error(
+          "The packages API returned an invalid response."
+        );
       }
 
-      setBookedTimes(data.bookedTimes || []);
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not load studio packages."
+        );
+      }
+
+      const mappedPackages = (data.packages || []).map(
+        mapPublicPackage
+      );
+
+      if (!isCancelled) {
+        setPackages(mappedPackages);
+      }
     } catch (error) {
-      console.error("Slot checking error:", error);
-      setBookedTimes([]);
+      console.error("Public package loading failed:", error);
+
+      if (!isCancelled) {
+        setPackages([]);
+        setPackagesError(error.message);
+      }
     } finally {
-      setIsCheckingSlots(false);
+      if (!isCancelled) {
+        setPackagesLoading(false);
+      }
     }
   };
 
-  checkAvailableSlots();
-}, [bookingForm.date]);
+  loadPublicPackages();
+
+  return () => {
+    isCancelled = true;
+  };
+}, []);
+
+useEffect(() => {
+  if (!bookingPackages.length) {
+    return;
+  }
+
+  setBookingForm((current) => {
+    const selectedPackageStillExists =
+      bookingPackages.some(
+        (pkg) => pkg.id === current.packageId
+      );
+
+    if (selectedPackageStillExists) {
+      return current;
+    }
+
+    return {
+      ...current,
+      packageId: bookingPackages[0].id,
+    };
+  });
+}, [bookingPackages]);
+
+ const selectedBookingPackage =
+  bookingPackages.find(
+    (pkg) => pkg.id === bookingForm.packageId
+  ) ||
+  bookingPackages[0] ||
+  null;
+
+const selectedPackagePrice =
+  selectedBookingPackage?.priceValue ?? 0;
+  const selectedPackageDeposit = Math.min(
+  Math.max(
+    selectedBookingPackage?.depositValue ?? 0,
+    0
+  ),
+  selectedPackagePrice
+);
+  const rawPaymentSummary = calculateBookingPayment(
+  selectedPackagePrice,
+  selectedPackageDeposit,
+  paymentOption
+);
+
+  const discountAmount = validatedDiscount?.discountAmount || 0;
+
+  const discountedAmountDueToday =
+    paymentOption === "full_online"
+      ? Math.max(rawPaymentSummary.amountDueToday - discountAmount, 0)
+      : rawPaymentSummary.amountDueToday;
+
+  const paymentSummary = {
+    ...rawPaymentSummary,
+    amountDueToday: discountedAmountDueToday,
+    discountCode: validatedDiscount?.code || "",
+    discountAmount,
+  };
+
+  const availableSlots = useMemo(() => {
+    if (!bookingForm.date) return [];
+
+    return bookingSlots.filter((slot) => !bookedTimes.includes(slot.value));
+  }, [bookingForm.date, bookedTimes]);
+
+  useEffect(() => {
+    if (!bookingForm.date) {
+      setBookedTimes([]);
+      return;
+    }
+
+    const checkAvailableSlots = async () => {
+      try {
+        setIsCheckingSlots(true);
+
+        setBookingForm((current) => ({
+          ...current,
+          time: "",
+        }));
+
+        const response = await fetch(
+          `/api/available-slots?date=${encodeURIComponent(bookingForm.date)}`
+        );
+
+        const responseText = await response.text();
+
+        let data = {};
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+          console.error("Available slots returned non-JSON:", responseText);
+          setBookedTimes([]);
+          alert(
+            "The slot checker returned an invalid response. Please check the available-slots API route."
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          console.error("Available slots API error:", data);
+          setBookedTimes([]);
+          alert(data.error || "Could not check available slots.");
+          return;
+        }
+
+        setBookedTimes(data.bookedTimes || []);
+      } catch (error) {
+        console.error("Slot checking error:", error);
+        setBookedTimes([]);
+        alert(`Slot checking error: ${error.message}`);
+      } finally {
+        setIsCheckingSlots(false);
+      }
+    };
+
+    checkAvailableSlots();
+  }, [bookingForm.date]);
+
+  useEffect(() => {
+    setValidatedDiscount(null);
+    setDiscountMessage("");
+
+    if (paymentOption !== "full_online") {
+      setDiscountCode("");
+    }
+  }, [selectedBookingPackage?.id, paymentOption]);
 
   const openMessenger = () => window.open(messengerLink, "_blank");
   const openCall = () => window.open(phoneLink);
   const openMaps = () => window.open(mapLink, "_blank");
 
   const openBookingDrawer = () => {
-    setIsBookingOpen(true);
-  };
+  if (!bookingPackages.length) {
+    alert(
+      packagesError ||
+        "The studio packages are still loading. Please try again."
+    );
+    return;
+  }
+
+  setIsBookingOpen(true);
+};
 
   const closeBookingDrawer = () => {
     setIsBookingOpen(false);
@@ -369,38 +511,37 @@ useEffect(() => {
 
     setIsBookingOpen(true);
   };
-const submitBookingPreview = async (event) => {
-  event.preventDefault();
 
-  if (!bookingForm.time) {
-    alert("Please choose an available time before continuing.");
-    return;
-  }
+  const checkDiscountCode = async () => {
+    const cleanCode = discountCode.trim().toUpperCase();
 
-  try {
-    const basePayload = {
-      packageTitle: selectedBookingPackage.title,
-      packagePrice: selectedPackagePrice,
-      amountDueToday: paymentSummary.amountDueToday,
-      remainingBalance: paymentSummary.remainingBalance,
-      date: bookingForm.date,
-      time: bookingForm.time,
-      name: bookingForm.name,
-      phone: bookingForm.phone,
-      email: bookingForm.email,
-      notes: bookingForm.notes,
-      paymentOption,
-      discountCode: paymentSummary.discountCode,
-      discountAmount: paymentSummary.discountAmount,
-    };
+    if (!cleanCode) {
+      setValidatedDiscount(null);
+      setDiscountMessage("");
+      return;
+    }
 
-    if (paymentOption === "full_online") {
-      const response = await fetch("/api/create-checkout", {
+    if (paymentOption !== "full_online") {
+      setValidatedDiscount(null);
+      setDiscountMessage("Discount codes are available for full online payment only.");
+      return;
+    }
+
+    try {
+      setIsCheckingDiscount(true);
+      setValidatedDiscount(null);
+      setDiscountMessage("");
+
+      const response = await fetch("/api/validate-discount", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(basePayload),
+        body: JSON.stringify({
+          code: cleanCode,
+          packagePrice: selectedPackagePrice,
+          packageTitle: selectedBookingPackage.title,
+        }),
       });
 
       const responseText = await response.text();
@@ -409,93 +550,164 @@ const submitBookingPreview = async (event) => {
       try {
         data = responseText ? JSON.parse(responseText) : {};
       } catch (error) {
-        console.error("Non-JSON API response:", responseText);
-        throw new Error("The checkout API did not return a valid response.");
+        console.error("Discount API returned non-JSON:", responseText);
+        throw new Error("The discount checker returned an invalid response.");
       }
 
       if (!response.ok) {
-        console.error("Checkout API error:", data);
-        throw new Error(data.error || "Unable to create checkout.");
+        throw new Error(data.error || "Could not check discount code.");
       }
 
-      if (!data.checkoutUrl) {
-        console.error("Missing checkoutUrl:", data);
-        throw new Error("Checkout link was not created.");
+      if (!data.valid) {
+        setValidatedDiscount(null);
+        setDiscountMessage(data.error || "Discount code not applied.");
+        return;
       }
 
-      window.location.href = data.checkoutUrl;
+      setValidatedDiscount(data);
+      setDiscountMessage(data.message || "Discount applied.");
+    } catch (error) {
+      console.error("Discount validation error:", error);
+      setValidatedDiscount(null);
+      setDiscountMessage(error.message);
+    } finally {
+      setIsCheckingDiscount(false);
+    }
+  };
+
+  const submitBookingPreview = async (event) => {
+    event.preventDefault();
+
+    if (!bookingForm.time) {
+      alert("Please choose an available time before continuing.");
       return;
     }
 
-    const response = await fetch("/api/create-booking-request", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...basePayload,
-        paymentOption: "dp_gcash_balance_instudio",
-      }),
-    });
+    try {
+      const basePayload = {
+        packageId: selectedBookingPackage.id,
+        packageTitle: selectedBookingPackage.title,
+        packagePrice: selectedPackagePrice,
+        amountDueToday: paymentSummary.amountDueToday,
+        remainingBalance: paymentSummary.remainingBalance,
+        date: bookingForm.date,
+        time: bookingForm.time,
+        name: bookingForm.name,
+        phone: bookingForm.phone,
+        email: bookingForm.email,
+        notes: bookingForm.notes,
+        paymentOption,
+        discountCode: paymentSummary.discountCode,
+        discountAmount: paymentSummary.discountAmount,
+      };
 
-    const data = await response.json();
+      if (paymentOption === "full_online") {
+        const response = await fetch("/api/create-checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(basePayload),
+        });
 
-    if (!response.ok) {
-      console.error(data);
-      alert("Sorry, we could not submit your booking request. Please try again.");
-      return;
+        const responseText = await response.text();
+
+        let data = {};
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+          console.error("Non-JSON API response:", responseText);
+          throw new Error("The checkout API did not return a valid response.");
+        }
+
+        if (!response.ok) {
+          console.error("Checkout API error:", data);
+          throw new Error(data.error || "Unable to create checkout.");
+        }
+
+        if (!data.checkoutUrl) {
+          console.error("Missing checkoutUrl:", data);
+          throw new Error("Checkout link was not created.");
+        }
+
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+
+      const response = await fetch("/api/create-booking-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...basePayload,
+          paymentOption: "dp_gcash_balance_instudio",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(data);
+        alert("Sorry, we could not submit your booking request. Please try again.");
+        return;
+      }
+
+      window.location.href = `/?booking=requested&ref=${data.bookingReference}`;
+    } catch (error) {
+      console.error("Frontend checkout error:", error);
+      alert(`Checkout error: ${error.message}`);
     }
+  };
 
-    window.location.href = `/?booking=requested&ref=${data.bookingReference}`;
-  } catch (error) {
-    console.error("Frontend checkout error:", error);
-    alert(`Checkout error: ${error.message}`);
-  }
-};
-if (bookingStatus === "requested") {
-  const bookingReference =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("ref")
-      : "";
+  if (bookingStatus === "requested") {
+    const bookingReference =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("ref")
+        : "";
 
-  return (
-    <main className="site">
-      <style>{css}</style>
+    return (
+      <main className="site">
+        <style>{css}</style>
 
-      <section className="thank-you-page">
-        <div className="thank-you-card">
-          <p className="eyebrow">Booking Request Received</p>
-          <h1>Thank you. We received your booking request.</h1>
-          <p>
-            Your preferred slot has been submitted for review. We’ll send our
-            GCash payment details shortly. Your booking is confirmed only once
-            payment has been received.
-          </p>
-
-          {bookingReference && (
+        <section className="thank-you-page">
+          <div className="thank-you-card">
+            <p className="eyebrow">Booking Request Received</p>
+            <h1>Thank you. We received your booking request.</h1>
             <p>
-              <strong>Reference:</strong> {bookingReference}
-            </p>
-          )}
+  Your selected slot has been temporarily reserved for 2 hours.
+  We’ll send the GCash payment details to your email shortly.
+  Please complete the required deposit and send your proof of
+  payment through Messenger within the 2-hour hold period.
+  If payment is not received and verified in time, the hold will
+  expire automatically and the slot may become available again.
+</p>
 
-          <div className="thank-you-actions">
-            <a className="btn btn-dark" href="/">
-              Back to Home
-            </a>
-            <a
-              className="btn btn-outline"
-              href="https://m.me/254698671071327"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Message Us
-            </a>
+            {bookingReference && (
+              <p>
+                <strong>Reference:</strong> {bookingReference}
+              </p>
+            )}
+
+            <div className="thank-you-actions">
+              <a className="btn btn-dark" href="/">
+                Back to Home
+              </a>
+              <a
+                className="btn btn-outline"
+                href="https://m.me/254698671071327"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Message Us
+              </a>
+            </div>
           </div>
-        </div>
-      </section>
-    </main>
-  );
-}
+        </section>
+      </main>
+    );
+  }
+
   if (bookingStatus === "success") {
     return (
       <main className="site">
@@ -672,21 +884,70 @@ if (bookingStatus === "requested") {
           <p className="eyebrow">Pricing</p>
           <h2>Studio Packages</h2>
           <p>
-            Clear starting prices with guided posing, professional studio background,
-            selected prints, and soft copies included depending on the package.
+            Clear starting prices with guided posing, professional studio
+            background, selected prints, and soft copies included depending on
+            the package.
           </p>
         </div>
 
         <div className="package-grid">
-          {packages.map((pkg) => (
-            <article className={`package-card package-${pkg.id}`} key={pkg.id}>
+  {packagesLoading && (
+    <p className="packages-loading">
+      Loading studio packages...
+    </p>
+  )}
+
+  {!packagesLoading && packagesError && (
+    <p className="packages-error">
+      {packagesError}
+    </p>
+  )}
+
+  {!packagesLoading &&
+    !packagesError &&
+    packages.length === 0 && (
+      <p className="packages-loading">
+        No active packages are currently available.
+      </p>
+    )}
+
+  {packages.map((pkg) => (
+  <article
+    className="package-card"
+    key={pkg.id}
+    style={{
+      borderTop: `4px solid ${pkg.color}`,
+    }}
+  >
               <figure className="package-media">
-                <img src={pkg.image} alt={`${pkg.title} sample`} />
-              </figure>
+  <img
+    src={pkg.image}
+    alt={`${pkg.title} sample`}
+    onLoad={(event) => {
+      const image = event.currentTarget;
+      const imageBox = image.closest(".package-media");
+
+      if (!imageBox) return;
+
+      const isPortrait =
+        image.naturalHeight > image.naturalWidth;
+
+      imageBox.classList.toggle(
+        "package-media-portrait",
+        isPortrait
+      );
+
+      imageBox.classList.toggle(
+        "package-media-landscape",
+        !isPortrait
+      );
+    }}
+  />
+</figure>
               <div className="package-content">
                 <div className="package-topline">
-                  <span>{pkg.id}</span>
-                  <small>{pkg.tag}</small>
+<span>{pkg.displayNumber}</span>              
+    <small>{pkg.tag}</small>
                 </div>
                 <h3>{pkg.title}</h3>
                 <p className="package-desc">{pkg.desc}</p>
@@ -733,8 +994,9 @@ if (bookingStatus === "requested") {
               <p className="eyebrow">And More</p>
               <h3>Something Else in Mind?</h3>
               <p>
-                For maternity, newborn, graduation, engagement, pre-wedding, product,
-                food, ID photos, or special events — send us a message and we’ll guide you.
+                For maternity, newborn, graduation, engagement, pre-wedding,
+                product, food, ID photos, or special events — send us a message
+                and we’ll guide you.
               </p>
               <button className="btn btn-gold" onClick={openMessenger}>
                 Ask Us Anything
@@ -743,7 +1005,6 @@ if (bookingStatus === "requested") {
           </article>
         </div>
       </section>
-
 
       <section className="section-wrap why-section">
         <div className="section-heading narrow">
@@ -757,77 +1018,79 @@ if (bookingStatus === "requested") {
         </div>
       </section>
 
-     <section id="contact" className="contact-section">
-  <div className="section-wrap contact-layout">
-    <div className="contact-main">
-      <p className="eyebrow">Where to Find Us</p>
-      <h2>Visit Abelle Studios</h2>
-      <p>
-  Drop by our studio for portraits, creative shoots, ID photos, and special
-  milestones. Use the map to find us easily, or message us before visiting so
-  we can prepare your slot.
-</p>
+      <section id="contact" className="contact-section">
+        <div className="section-wrap contact-layout">
+          <div className="contact-main">
+            <p className="eyebrow">Where to Find Us</p>
+            <h2>Visit Abelle Studios</h2>
+            <p>
+              Drop by our studio for portraits, creative shoots, ID photos, and
+              special milestones. Use the map to find us easily, or message us
+              before visiting so we can prepare your slot.
+            </p>
 
-      <div className="location-card">
-        <small>Exact Location</small>
-        <strong>Room 208, 2nd Floor, E.I. Building</strong>
-        <span>Calle II de Febrero, Tradetown Funda-Dalipe, San Jose, Antique</span>
-      </div>
+            <div className="location-card">
+              <small>Exact Location</small>
+              <strong>Room 208, 2nd Floor, E.I. Building</strong>
+              <span>
+                Calle II de Febrero, Tradetown Funda-Dalipe, San Jose, Antique
+              </span>
+            </div>
 
-      <div className="contact-icon-row" aria-label="Abelle Studios contact links">
-        {socialLinks.map(({ name, href, icon }) => (
-          <a
-            key={name}
-            href={href}
-            target={href.startsWith("http") ? "_blank" : undefined}
-            rel={href.startsWith("http") ? "noreferrer" : undefined}
-            aria-label={name}
-            title={name}
-          >
-            <SocialIcon type={icon} size={19} />
-          </a>
-        ))}
-      </div>
+            <div className="contact-icon-row" aria-label="Abelle Studios contact links">
+              {socialLinks.map(({ name, href, icon }) => (
+                <a
+                  key={name}
+                  href={href}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noreferrer" : undefined}
+                  aria-label={name}
+                  title={name}
+                >
+                  <SocialIcon type={icon} size={19} />
+                </a>
+              ))}
+            </div>
 
-      <div className="contact-actions refined">
-        <a
-          className="btn btn-dark"
-          href="https://maps.app.goo.gl/HW5aFdSiMmYcSvWx6"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open in Google Maps
-        </a>
-        <button className="btn btn-outline" onClick={openBookingDrawer}>
-          Book a Session
-        </button>
-      </div>
-    </div>
+            <div className="contact-actions refined">
+              <a
+                className="btn btn-dark"
+                href="https://maps.app.goo.gl/HW5aFdSiMmYcSvWx6"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in Google Maps
+              </a>
+              <button className="btn btn-outline" onClick={openBookingDrawer}>
+                Book a Session
+              </button>
+            </div>
+          </div>
 
-    <aside className="map-card">
-      <div className="map-frame">
-        <iframe
-          title="Abelle Studios Location"
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3547.1548395351797!2d121.93561140000001!3d10.7549957!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33ae39c8d56e68d5%3A0x6ad2d0aa256d7e47!2sAbelle%20Studios!5e1!3m2!1sen!2sph!4v1781153469141!5m2!1sen!2sph"
-          width="600"
-          height="450"
-          style={{ border: 0 }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-      </div>
+          <aside className="map-card">
+            <div className="map-frame">
+              <iframe
+                title="Abelle Studios Location"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3547.1548395351797!2d121.93561140000001!3d10.7549957!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33ae39c8d56e68d5%3A0x6ad2d0aa256d7e47!2sAbelle%20Studios!5e1!3m2!1sen!2sph!4v1781153469141!5m2!1sen!2sph"
+                width="600"
+                height="450"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
 
-      <div className="map-card-caption">
-        <small>Abelle Studios</small>
-        <span>San Jose, Antique</span>
-      </div>
-    </aside>
-  </div>
-</section>
+            <div className="map-card-caption">
+              <small>Abelle Studios</small>
+              <span>San Jose, Antique</span>
+            </div>
+          </aside>
+        </div>
+      </section>
 
-      {isBookingOpen && (
-        <div className="drawer-overlay" onClick={closeBookingDrawer}>
+{isBookingOpen && selectedBookingPackage && (        
+  <div className="drawer-overlay" onClick={closeBookingDrawer}>
           <aside
             className="booking-drawer"
             onClick={(event) => event.stopPropagation()}
@@ -895,8 +1158,9 @@ if (bookingStatus === "requested") {
                     type="text"
                     value={
                       bookingForm.time
-                        ? bookingSlots.find((slot) => slot.value === bookingForm.time)
-                            ?.label
+                        ? bookingSlots.find(
+                            (slot) => slot.value === bookingForm.time
+                          )?.label
                         : "Choose below"
                     }
                     readOnly
@@ -905,40 +1169,41 @@ if (bookingStatus === "requested") {
               </div>
 
               {bookingForm.date && (
-  <div className="drawer-slot-picker">
-    <span>Available times</span>
+                <div className="drawer-slot-picker">
+                  <span>Available times</span>
 
-    {isCheckingSlots ? (
-      <p className="drawer-small-note">Checking available times...</p>
-    ) : availableSlots.length > 0 ? (
-      <div className="drawer-slot-grid">
-        {availableSlots.map((slot) => (
-          <button
-            type="button"
-            key={slot.value}
-            className={
-              bookingForm.time === slot.value
-                ? "drawer-slot active"
-                : "drawer-slot"
-            }
-            onClick={() =>
-              setBookingForm((current) => ({
-                ...current,
-                time: slot.value,
-              }))
-            }
-          >
-            {slot.label}
-          </button>
-        ))}
-      </div>
-    ) : (
-      <p className="drawer-small-note">
-        Sorry, all slots are booked for this date. Please choose another date.
-      </p>
-    )}
-  </div>
-)}
+                  {isCheckingSlots ? (
+                    <p className="drawer-small-note">Checking available times...</p>
+                  ) : availableSlots.length > 0 ? (
+                    <div className="drawer-slot-grid">
+                      {availableSlots.map((slot) => (
+                        <button
+                          type="button"
+                          key={slot.value}
+                          className={
+                            bookingForm.time === slot.value
+                              ? "drawer-slot active"
+                              : "drawer-slot"
+                          }
+                          onClick={() =>
+                            setBookingForm((current) => ({
+                              ...current,
+                              time: slot.value,
+                            }))
+                          }
+                        >
+                          {slot.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="drawer-small-note">
+                      Sorry, all slots are booked for this date. Please choose
+                      another date.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <label>
                 <span>Full name</span>
@@ -986,128 +1251,142 @@ if (bookingStatus === "requested") {
               </label>
 
               <div className="drawer-field">
-  <span className="drawer-field-title">Choose your payment option</span>
+                <span className="drawer-field-title">Choose your payment option</span>
 
-  <div className="payment-options">
-    <label
-      className={
-        paymentOption === "full_online"
-          ? "payment-option-card active"
-          : "payment-option-card"
-      }
-    >
-      <input
-        type="radio"
-        name="paymentOption"
-        value="full_online"
-        checked={paymentOption === "full_online"}
-        onChange={(event) => setPaymentOption(event.target.value)}
-      />
-      <span>
-        <strong>Pay in full online</strong>
-        <small>
-          Pay the full package amount through PayMongo. Online processing fees
-          are added at checkout. Your booking is automatically confirmed once
-          payment is completed.
-        </small>
-      </span>
-    </label>
+                <div className="payment-options">
+                  <label
+                    className={
+                      paymentOption === "full_online"
+                        ? "payment-option-card active"
+                        : "payment-option-card"
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="paymentOption"
+                      value="full_online"
+                      checked={paymentOption === "full_online"}
+                      onChange={(event) => setPaymentOption(event.target.value)}
+                    />
+                    <span>
+                      <strong>Pay in full online</strong>
+                      <small>
+                        Pay the full package amount through PayMongo. Online
+                        processing fees are added at checkout. Your booking is
+                        automatically confirmed once payment is completed.
+                      </small>
+                    </span>
+                  </label>
 
-    <label
-      className={
-        paymentOption === "dp_gcash_balance_instudio"
-          ? "payment-option-card active"
-          : "payment-option-card"
-      }
-    >
-      <input
-        type="radio"
-        name="paymentOption"
-        value="dp_gcash_balance_instudio"
-        checked={paymentOption === "dp_gcash_balance_instudio"}
-        onChange={(event) => setPaymentOption(event.target.value)}
-      />
-      <span>
-        <strong>50% down payment via GCash</strong>
-        <small>
-          Receive our GCash details by email. Please send your proof of payment
-          to Messenger so we can manually confirm your booking. The remaining
-          balance is payable in-studio.
-        </small>
-      </span>
-    </label>
-  </div>
+                  <label
+                    className={
+                      paymentOption === "dp_gcash_balance_instudio"
+                        ? "payment-option-card active"
+                        : "payment-option-card"
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="paymentOption"
+                      value="dp_gcash_balance_instudio"
+                      checked={paymentOption === "dp_gcash_balance_instudio"}
+                      onChange={(event) => setPaymentOption(event.target.value)}
+                    />
+                    <span>
+                      <strong>Pay deposit via GCash</strong>
+<small>
+  Pay ₱{selectedPackageDeposit.toLocaleString()} via GCash
+  to secure your booking. Your selected slot will be held
+  for 2 hours from the time you submit this request. If we
+  do not receive your payment proof within 2 hours, the hold
+  will automatically expire and the slot may become available
+  to another client.
+</small>
+                    </span>
+                  </label>
+                </div>
 
-  {paymentOption === "full_online" && (
-    <div className="discount-code-box">
-      <label htmlFor="discountCode">Discount Code</label>
-      <input
-        id="discountCode"
-        type="text"
-        value={discountCode}
-        onChange={(event) => setDiscountCode(event.target.value)}
-        placeholder="Enter discount code"
-      />
+              {paymentOption === "full_online" && (
+  <div className="discount-code-box">
+    <label htmlFor="discountCode">Discount Code</label>
+    <input
+      id="discountCode"
+      type="text"
+      value={discountCode}
+      onChange={(event) => {
+        setDiscountCode(event.target.value);
+        setValidatedDiscount(null);
+        setDiscountMessage("");
+      }}
+      placeholder="Enter discount code"
+    />
 
-      {discountCode.trim() && (
-        <p className={hasDiscount ? "discount-valid" : "discount-invalid"}>
-          {hasDiscount
-  ? "Discount applied. ₱100 off your booking."
-  : "Discount code not applied."}
-        </p>
-      )}
+    <div className="discount-code-actions">
+      <button
+        type="button"
+        className="discount-check-btn"
+        onClick={checkDiscountCode}
+        disabled={isCheckingDiscount || !discountCode.trim()}
+      >
+        {isCheckingDiscount ? "Checking..." : "Apply Code"}
+      </button>
     </div>
-  )}
-</div>
+
+    {discountMessage && (
+      <p className={validatedDiscount ? "discount-valid" : "discount-invalid"}>
+        {discountMessage}
+      </p>
+    )}
+  </div>
+)}
+              </div>
 
               <div className="drawer-payment-preview">
-  <div>
-    <span>Package price</span>
-    <strong>₱{selectedPackagePrice.toLocaleString()}</strong>
-  </div>
+                <div>
+                  <span>Package price</span>
+                  <strong>₱{selectedPackagePrice.toLocaleString()}</strong>
+                </div>
 
-  {paymentSummary.discountAmount > 0 && (
-    <div>
-      <span>Discount applied</span>
-      <strong>-₱{paymentSummary.discountAmount.toLocaleString()}</strong>
-    </div>
-  )}
+                {paymentSummary.discountAmount > 0 && (
+                  <div>
+                    <span>Discount applied</span>
+                    <strong>-₱{paymentSummary.discountAmount.toLocaleString()}</strong>
+                  </div>
+                )}
 
-  <div>
-    <span>Payment method</span>
-    <strong>
-      {paymentOption === "full_online"
-        ? "PayMongo full online payment"
-        : "GCash down payment"}
-    </strong>
-  </div>
+                <div>
+                  <span>Payment method</span>
+                  <strong>
+                    {paymentOption === "full_online"
+                      ? "PayMongo full online payment"
+: "GCash deposit"}                  </strong>
+                </div>
 
-  <div className="drawer-payment-total">
-    <span>
-      {paymentOption === "full_online"
-        ? "Full payment now"
-        : "Down payment now"}
-    </span>
-    <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
-  </div>
+                <div className="drawer-payment-total">
+                  <span>
+                    {paymentOption === "full_online"
+                      ? "Full payment now"
+: "Deposit due now"}                  </span>
+                  <strong>₱{paymentSummary.amountDueToday.toLocaleString()}</strong>
+                </div>
 
-  <div>
-    <span>Remaining balance</span>
-    <strong>₱{paymentSummary.remainingBalance.toLocaleString()}</strong>
-  </div>
-</div>
+                <div>
+                  <span>Remaining balance</span>
+                  <strong>₱{paymentSummary.remainingBalance.toLocaleString()}</strong>
+                </div>
+              </div>
 
-             <button className="btn btn-dark full" disabled={!bookingForm.time}>
-  {paymentOption === "full_online"
-    ? "Continue to PayMongo Checkout"
-    : "Submit Booking Request"}
-</button>
+              <button className="btn btn-dark full" disabled={!bookingForm.time}>
+                {paymentOption === "full_online"
+                  ? "Continue to PayMongo Checkout"
+                  : "Submit Booking Request"}
+              </button>
 
               <p className="drawer-small-note">
-  {paymentOption === "full_online"
-    ? "You will be redirected to our secure PayMongo checkout page. Online processing fees are added at checkout."
-    : "We’ll email the GCash payment details after receiving your request. Please send proof of payment through Messenger so we can manually confirm your booking."}
-</p>
+                {paymentOption === "full_online"
+                  ? "You will be redirected to our secure PayMongo checkout page. Online processing fees are added at checkout."
+                  : "We’ll email the GCash payment details after receiving your request. Your selected slot will be held for 2 hours only. Please pay the required deposit and send your proof of payment through Messenger before the hold expires."}
+              </p>
             </form>
           </aside>
         </div>
@@ -1380,27 +1659,45 @@ p { color: var(--muted); line-height: 1.75; }
   overflow: hidden;
 }
 
-.package-media { margin: 0; background: var(--soft); overflow: hidden; }
+.package-media {
+  margin: 0;
+  background: var(--soft);
+  overflow: hidden;
+  width: 100%;
+}
+
+.package-media-portrait {
+  aspect-ratio: 3 / 4;
+}
+
+.package-media-landscape {
+  aspect-ratio: 4 / 3;
+}
+
+.packages-loading,
+.packages-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 28px;
+  text-align: center;
+  background: var(--paper);
+  border: 1px solid var(--faint);
+}
+
+.packages-error {
+  color: #991b1b;
+}
 
 .package-media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center;
   display: block;
   transition: transform .35s ease;
 }
 
 .package-card:hover .package-media img { transform: scale(1.018); }
-
-.package-01 .package-media,
-.package-02 .package-media {
-  aspect-ratio: 3 / 4;
-}
-
-.package-03 .package-media,
-.package-04 .package-media {
-  aspect-ratio: 4 / 3;
-}
 
 .package-01 .package-media img { object-position: center 28%; }
 .package-02 .package-media img { object-position: center 18%; }
@@ -2046,6 +2343,31 @@ li::before {
   color: #111;
 }
 
+.discount-code-actions {
+  margin-top: 10px;
+}
+
+.discount-check-btn {
+  width: 100%;
+  border: 1px solid #111;
+  background: #111;
+  color: #f8f5ef !important;
+  min-height: 42px;
+  padding: 0 14px;
+  font-family: 'Jost', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  cursor: pointer;
+}
+
+.discount-check-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+
 .discount-valid {
   margin-top: 8px;
   font-size: 0.85rem;
@@ -2097,6 +2419,7 @@ li::before {
   font-size: 12px;
   margin: -3px 0 0;
 }
+
 .thank-you-page {
   min-height: 100vh;
   display: grid;
@@ -2134,11 +2457,12 @@ li::before {
   gap: 12px;
   flex-wrap: wrap;
 }
+
 @media (max-width: 980px) {
   .hero,
-.contact-layout {
-  grid-template-columns: 1fr;
-}
+  .contact-layout {
+    grid-template-columns: 1fr;
+  }
 
   .hero-visual {
     max-width: 520px;
@@ -2187,41 +2511,42 @@ li::before {
   }
 
   .hero-actions,
-.contact-actions.refined {
-  flex-direction: column;
-}
+  .contact-actions.refined {
+    flex-direction: column;
+  }
 
   .btn {
-  width: 100%;
-}
+    width: 100%;
+  }
 
-.contact-section {
-  padding: 52px 0;
-}
+  .contact-section {
+    padding: 52px 0;
+  }
 
-.contact-main {
-  text-align: center;
-}
+  .contact-main {
+    text-align: center;
+  }
 
-.contact-main h2,
-.contact-main p {
-  margin-left: auto;
-  margin-right: auto;
-}
+  .contact-main h2,
+  .contact-main p {
+    margin-left: auto;
+    margin-right: auto;
+  }
 
-.contact-icon-row {
-  justify-content: center;
-}
+  .contact-icon-row {
+    justify-content: center;
+  }
 
-.map-frame {
-  height: 320px;
-}
+  .map-frame {
+    height: 320px;
+  }
 
-.map-card-caption {
-  flex-direction: column;
-  text-align: center;
-  gap: 6px;
-}
+  .map-card-caption {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+  }
+
   .hero-visual {
     min-height: auto;
   }
@@ -2313,5 +2638,14 @@ li::before {
   }
 }
 `;
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<PublicWebsite />} />
+      <Route path="/admin/*" element={<Admin />} />
+    </Routes>
+  );
+}
 
 export default App;
