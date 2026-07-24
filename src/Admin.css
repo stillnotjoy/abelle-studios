@@ -1324,3 +1324,168 @@ overflow: hidden;
     padding: 18px;
   }
 }
+
+/* =======================================
+   ADMIN MOBILE LAYOUT FIX
+======================================= */
+
+@media (max-width: 900px) {
+  .admin-page {
+    display: block;
+    min-width: 0;
+  }
+
+  .admin-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 12px 14px 10px;
+    gap: 10px;
+
+    border-right: 0;
+    border-bottom: 1px solid rgba(32, 25, 18, 0.12);
+
+    background: #fffaf2;
+  }
+
+  .admin-brand {
+    justify-content: flex-start;
+    padding: 0 4px 8px;
+  }
+
+  .admin-sidebar-logo {
+    width: auto;
+    max-width: 170px;
+    max-height: 48px;
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 8px;
+
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    padding: 0 0 4px;
+
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-nav button {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 42px;
+
+    padding: 10px 13px;
+
+    white-space: nowrap;
+    border-radius: 8px;
+  }
+
+  .admin-nav-icon {
+    width: 19px;
+    flex-basis: 19px;
+  }
+
+  .admin-main {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    padding: 20px 16px 32px;
+    overflow: visible;
+  }
+
+  .admin-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .admin-header > div {
+    min-width: 0;
+  }
+
+  .admin-header h1 {
+    font-size: clamp(34px, 10vw, 46px);
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-logout {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  .admin-panel {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    padding: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-sidebar {
+    padding: 10px 12px 8px;
+  }
+
+  .admin-sidebar-logo {
+    max-width: 150px;
+    max-height: 42px;
+  }
+
+  .admin-nav button {
+    min-height: 40px;
+    padding: 9px 11px;
+    font-size: 14px;
+  }
+
+  .admin-nav button span:last-child {
+    display: none;
+  }
+
+  .admin-nav-icon {
+    width: 22px;
+    flex-basis: 22px;
+  }
+
+  .admin-main {
+    padding: 18px 12px 28px;
+  }
+
+  .admin-header h1 {
+    font-size: 38px;
+  }
+
+  .admin-logout {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 10px;
+  }
+
+  .admin-panel {
+    padding: 14px;
+  }
+
+  .manual-booking-list h3 {
+    font-size: 32px;
+    text-align: center;
+  }
+}
