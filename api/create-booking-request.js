@@ -1,3 +1,5 @@
+import { createOnlineBookingReference } from "../lib/booking-reference.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -62,25 +64,6 @@ async function getPackageFromSupabase(packageId) {
   }
 
   return Array.isArray(data) ? data[0] || null : null;
-}
-
-function getOnlineBookingReference(
-  data,
-  date,
-  time
-) {
-  const appsScriptReference = cleanText(
-    data?.bookingReference
-  );
-
-  if (appsScriptReference) {
-    return appsScriptReference;
-  }
-
-  const cleanDate = date.replaceAll("-", "");
-  const cleanTime = time.replace(":", "");
-
-  return `ABELLE-${cleanDate}-${cleanTime}`;
 }
 
 async function saveOnlineBookingToCrm({
@@ -283,7 +266,10 @@ export default async function handler(request, response) {
     );
 
     const bookingReference =
-      getOnlineBookingReference({}, date, time);
+      createOnlineBookingReference(
+        date,
+        selectedPackage.name
+      );
 
     const bookingPayload = {
       secret: appsScriptSecret || "",
