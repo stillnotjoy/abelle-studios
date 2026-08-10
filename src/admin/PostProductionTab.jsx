@@ -11,6 +11,7 @@ import {
   ExternalLink,
   FolderPlus,
   LoaderCircle,
+  RefreshCw,
   RotateCcw,
   Search,
   Send,
@@ -533,31 +534,52 @@ function PostProductionTab() {
             />
           </label>
 
-          <select
-            className="crm-production-filter"
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value
-              )
-            }
-          >
-            <option value="ACTIVE">
-              Active work
-            </option>
-            <option value="FOR_EDITING">
-              For Editing
-            </option>
-            <option value="READY_FOR_DELIVERY">
-              Ready for Delivery
-            </option>
-            <option value="DELIVERED">
-              Delivered
-            </option>
-            <option value="ALL">
-              All post-production
-            </option>
-          </select>
+          <div className="crm-production-toolbar-actions">
+            <select
+              className="crm-production-filter"
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(
+                  event.target.value
+                )
+              }
+            >
+              <option value="ACTIVE">
+                Active work
+              </option>
+              <option value="FOR_EDITING">
+                For Editing
+              </option>
+              <option value="READY_FOR_DELIVERY">
+                Ready for Delivery
+              </option>
+              <option value="DELIVERED">
+                Delivered
+              </option>
+              <option value="ALL">
+                All post-production
+              </option>
+            </select>
+
+            <button
+              type="button"
+              className="crm-production-refresh"
+              onClick={loadBookings}
+              disabled={isLoading}
+            >
+              <RefreshCw
+                size={14}
+                className={
+                  isLoading
+                    ? "crm-production-spinner"
+                    : ""
+                }
+              />
+              {isLoading
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+          </div>
         </div>
 
         <div className="crm-production-heading">

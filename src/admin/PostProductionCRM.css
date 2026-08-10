@@ -148,6 +148,39 @@
   cursor: pointer;
 }
 
+.crm-production-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-production-refresh {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #181512;
+  border-radius: 10px;
+  background: #181512;
+  color: #ffffff;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.crm-production-refresh:hover:not(:disabled) {
+  background: #2b2723;
+}
+
+.crm-production-refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .crm-production-heading {
   display: flex;
   align-items: center;
@@ -483,6 +516,15 @@
   .crm-production-search,
   .crm-production-filter {
     width: 100%;
+  }
+
+  .crm-production-toolbar-actions {
+    width: 100%;
+  }
+
+  .crm-production-filter {
+    min-width: 0;
+    flex: 1;
   }
 
   .crm-production-card {
