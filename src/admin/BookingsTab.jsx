@@ -1030,9 +1030,89 @@ function BookingsTab({
     }
   };
 
+  const markShootComplete =
+    async (booking) => {
+      if (!booking?.id) {
+        alert(
+          "This booking does not have a valid ID."
+        );
+        return;
+      }
 
+      const confirmed =
+        window.confirm(
+          `Mark the shoot for "${booking.client_name}" as completed?\n\nThis will move it into your For Editing queue.`
+        );
 
-  
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setMarkingShootCompleteId(
+          booking.id
+        );
+
+        const response = await fetch(
+          "/api/admin-manual-bookings",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              "x-admin-pin":
+                adminPin,
+            },
+            body: JSON.stringify({
+              action:
+                "mark_shoot_complete",
+              id: booking.id,
+            }),
+          }
+        );
+
+        const data =
+          await readJsonResponse(
+            response
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Could not mark the shoot as completed."
+          );
+        }
+
+        if (data.booking) {
+          setBookings((current) =>
+            current.map((item) =>
+              item.id === booking.id
+                ? data.booking
+                : item
+            )
+          );
+        } else {
+          await loadBookings();
+        }
+
+        alert(
+          data.message ||
+            "Shoot marked complete and moved to For Editing."
+        );
+      } catch (error) {
+        console.error(
+          "Mark shoot complete failed:",
+          error
+        );
+
+        alert(error.message);
+      } finally {
+        setMarkingShootCompleteId(
+          null
+        );
+      }
+    };
+
   const createClientDriveFolder =
     async (booking) => {
       if (!booking?.id) {
