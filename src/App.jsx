@@ -1269,11 +1269,14 @@ const selectedPackagePrice =
                       onChange={(event) => setPaymentOption(event.target.value)}
                     />
                     <span>
-                      <strong>Pay in full online</strong>
+                      <strong>
+                        Pay in full online — QR Ph or Card
+                      </strong>
                       <small>
-                        Pay the full package amount through PayMongo. Online
-                        processing fees are added at checkout. Your booking is
-                        automatically confirmed once payment is completed.
+                        Choose QR Ph or Visa/Mastercard on PayMongo. Card
+                        payments may require 3D Secure authentication. Online
+                        processing fees are added at checkout, and your booking
+                        is confirmed automatically after payment.
                       </small>
                     </span>
                   </label>
@@ -1358,7 +1361,7 @@ const selectedPackagePrice =
                   <span>Payment method</span>
                   <strong>
                     {paymentOption === "full_online"
-                      ? "PayMongo full online payment"
+                      ? "PayMongo — QR Ph or Card"
 : "GCash deposit"}                  </strong>
                 </div>
 
@@ -1384,7 +1387,7 @@ const selectedPackagePrice =
 
               <p className="drawer-small-note">
                 {paymentOption === "full_online"
-                  ? "You will be redirected to our secure PayMongo checkout page. Online processing fees are added at checkout."
+                  ? "You will be redirected to PayMongo to choose QR Ph or Card. Card authentication is handled securely by PayMongo. Online processing fees are added at checkout."
                   : "We’ll email the GCash payment details after receiving your request. Your selected slot will be held for 2 hours only. Please pay the required deposit and send your proof of payment through Messenger before the hold expires."}
               </p>
             </form>
