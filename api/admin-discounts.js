@@ -1,12 +1,7 @@
+import { requireAdmin } from "../server/adminAuth.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const ADMIN_DISCOUNT_PIN =
-  process.env.ADMIN_DISCOUNT_PIN ||
-  process.env.ADMIN_PIN ||
-  "1234";
-  
-console.log("ADMIN_DISCOUNT_PIN exists:", Boolean(process.env.ADMIN_DISCOUNT_PIN));
 
 function sendJson(res, status, data) {
   res.status(status).json(data);
@@ -14,26 +9,6 @@ function sendJson(res, status, data) {
 
 function normalizeCode(code) {
   return String(code || "").trim().toUpperCase();
-}
-
-function requireAdmin(req, res) {
-  const pinFromHeader = req.headers["x-admin-pin"];
-
-  if (!ADMIN_DISCOUNT_PIN) {
-    sendJson(res, 500, {
-      error: "ADMIN_DISCOUNT_PIN is not configured.",
-    });
-    return false;
-  }
-
-  if (!pinFromHeader || pinFromHeader !== ADMIN_DISCOUNT_PIN) {
-    sendJson(res, 401, {
-      error: "Unauthorized admin request.",
-    });
-    return false;
-  }
-
-  return true;
 }
 
 async function supabaseRequest(path, options = {}) {
@@ -75,7 +50,7 @@ async function supabaseRequest(path, options = {}) {
 
 export default async function handler(req, res) {
   try {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     if (req.method === "GET") {
       const discounts = await supabaseRequest(

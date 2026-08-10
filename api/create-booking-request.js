@@ -1,3 +1,5 @@
+import { createOnlineBookingReference } from "../lib/booking-reference.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -64,6 +66,99 @@ async function getPackageFromSupabase(packageId) {
   return Array.isArray(data) ? data[0] || null : null;
 }
 
+async function saveOnlineBookingToCrm({
+  bookingReference,
+  customerName,
+  email,
+  phone,
+  selectedPackage,
+  date,
+  time,
+  notes,
+  calendarData,
+}) {
+  const calendarEventId = cleanText(
+    calendarData?.eventId ||
+      calendarData?.calendarEventId
+  );
+
+  const crmResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/manual_bookings?on_conflict=booking_reference`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer:
+          "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({
+        booking_reference: bookingReference,
+        client_name: customerName,
+        email,
+        phone,
+        package_title: selectedPackage.name,
+        package_price: Number(
+          selectedPackage.default_price
+        ),
+        shoot_date: date,
+        shoot_time: time,
+        notes,
+        payment_status: "UNPAID",
+        amount_paid: 0,
+        remaining_balance: Number(
+          selectedPackage.default_price
+        ),
+        booking_status: "PENDING",
+        calendar_event_id:
+          calendarEventId || null,
+        calendar_status: calendarEventId
+          ? "CREATED"
+          : "PENDING",
+        booking_source: "WEBSITE",
+        payment_provider: "GCASH",
+        payment_option:
+          "dp_gcash_balance_instudio",
+        shoot_status: "SCHEDULED",
+        post_production_status:
+          "NOT_STARTED",
+      }),
+    }
+  );
+
+  const responseText =
+    await crmResponse.text();
+
+  let crmData = null;
+
+  try {
+    crmData = responseText
+      ? JSON.parse(responseText)
+      : null;
+  } catch {
+    crmData = responseText;
+  }
+
+  if (!crmResponse.ok) {
+    console.error(
+      "CRM booking save failed:",
+      crmData
+    );
+
+    throw new Error(
+      typeof crmData === "object" &&
+        crmData?.message
+        ? crmData.message
+        : "The booking could not be added to the CRM."
+    );
+  }
+
+  return Array.isArray(crmData)
+    ? crmData[0] || null
+    : crmData;
+}
+
 export default async function handler(request, response) {
   if (request.method !== "POST") {
     return sendJson(response, 405, {
@@ -77,13 +172,6 @@ export default async function handler(request, response) {
 
     const appsScriptSecret =
       process.env.GOOGLE_APPS_SCRIPT_SECRET;
-
-    if (!appsScriptUrl || !appsScriptSecret) {
-      return sendJson(response, 500, {
-        error:
-          "Missing Apps Script environment variables.",
-      });
-    }
 
     const body = request.body || {};
 
@@ -177,9 +265,16 @@ export default async function handler(request, response) {
       0
     );
 
+    const bookingReference =
+      createOnlineBookingReference(
+        date,
+        selectedPackage.name
+      );
+
     const bookingPayload = {
-      secret: appsScriptSecret,
+      secret: appsScriptSecret || "",
       action: "create_pending_booking",
+      bookingReference,
 
       packageId: selectedPackage.id,
       packageTitle: selectedPackage.name,
@@ -206,53 +301,101 @@ export default async function handler(request, response) {
       discountAmount: 0,
     };
 
-    const appsScriptResponse = await fetch(
-      appsScriptUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(bookingPayload),
+    let crmBooking =
+      await saveOnlineBookingToCrm({
+        bookingReference,
+        customerName,
+        email,
+        phone,
+        selectedPackage,
+        date,
+        time,
+        notes,
+        calendarData: null,
+      });
+
+    let calendarData = null;
+    let calendarWarning = "";
+
+    if (appsScriptUrl && appsScriptSecret) {
+      try {
+        const appsScriptResponse = await fetch(
+          appsScriptUrl,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(bookingPayload),
+          }
+        );
+
+        const responseText =
+          await appsScriptResponse.text();
+
+        try {
+          calendarData = responseText
+            ? JSON.parse(responseText)
+            : {};
+        } catch {
+          calendarWarning =
+            "The booking was saved to the CRM, but the calendar response could not be read.";
+
+          console.warn(
+            "Apps Script returned non-JSON after CRM save."
+          );
+        }
+
+        if (
+          calendarData &&
+          appsScriptResponse.ok &&
+          calendarData.ok
+        ) {
+          crmBooking = await saveOnlineBookingToCrm({
+            bookingReference,
+            customerName,
+            email,
+            phone,
+            selectedPackage,
+            date,
+            time,
+            notes,
+            calendarData,
+          });
+        } else if (!calendarWarning) {
+          calendarWarning =
+            "The booking was saved to the CRM, but Google Calendar has not synced yet.";
+
+          console.warn(
+            "Apps Script sync failed after CRM save:",
+            calendarData
+          );
+        }
+      } catch (calendarError) {
+        calendarWarning =
+          "The booking was saved to the CRM, but Google Calendar has not synced yet.";
+
+        console.warn(
+          "Apps Script sync error after CRM save:",
+          calendarError
+        );
       }
-    );
-
-    const responseText =
-      await appsScriptResponse.text();
-
-    let data;
-
-    try {
-      data = responseText
-        ? JSON.parse(responseText)
-        : {};
-    } catch {
-      console.error(
-        "Apps Script returned non-JSON:",
-        responseText
-      );
-
-      return sendJson(response, 500, {
-        error:
-          "Could not read Apps Script response.",
-      });
+    } else {
+      calendarWarning =
+        "The booking was saved to the CRM. Google Calendar is not configured yet.";
     }
 
-    if (!appsScriptResponse.ok || !data.ok) {
-      console.error(
-        "Apps Script booking error:",
-        data
-      );
-
-      return sendJson(response, 500, {
-        error:
-          data.error ||
-          "Could not save booking request.",
-        details: data,
-      });
-    }
-
-    return sendJson(response, 200, data);
+    return sendJson(response, 200, {
+      ...(calendarData?.ok ? calendarData : {}),
+      ok: true,
+      bookingReference,
+      crmBooking,
+      calendarStatus:
+        crmBooking?.calendar_status || "PENDING",
+      ...(calendarWarning
+        ? { calendarWarning }
+        : {}),
+    });
   } catch (error) {
     console.error(
       "Booking request error:",

@@ -1,5 +1,7 @@
 // api/create-checkout.js
 
+import { createOnlineBookingReference } from "../lib/booking-reference.js";
+
 function sendJson(res, status, data) {
   return res.status(status).json(data);
 }
@@ -10,13 +12,6 @@ function cleanText(value) {
 
 function normalizeCode(code) {
   return cleanText(code).toUpperCase();
-}
-
-function getBookingReference(date, time) {
-  const cleanDate = cleanText(date).replaceAll("-", "");
-  const cleanTime = cleanText(time).replace(":", "");
-
-  return `ABELLE-${cleanDate}-${cleanTime}`;
 }
 
 async function supabaseRequest(path, options = {}) {
@@ -411,7 +406,10 @@ export default async function handler(req, res) {
       "https://www.abellestudios.xyz";
 
     const bookingReference =
-      getBookingReference(date, time);
+      createOnlineBookingReference(
+        date,
+        selectedPackage.name
+      );
 
     const paymongoResponse = await fetch(
       "https://api.paymongo.com/v2/checkout_sessions",
@@ -444,6 +442,7 @@ export default async function handler(req, res) {
               ],
 
               payment_method_types: [
+                "card",
                 "qrph",
               ],
 
