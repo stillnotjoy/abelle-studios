@@ -210,6 +210,10 @@ function CalendarTab({
     useState(false);
   const [historyError, setHistoryError] =
     useState("");
+  const [isImportingHistory, setIsImportingHistory] =
+    useState(false);
+  const [historyImportMessage, setHistoryImportMessage] =
+    useState("");
   const adminPin = getSavedAdminPin();
 
   const loadBookings = useCallback(
@@ -359,6 +363,87 @@ function CalendarTab({
       }
     },
     [adminPin]
+  );
+
+  const importConfirmedHistory = useCallback(
+    async () => {
+      const readyToImport = Number(
+        historyPreview?.summary
+          ?.readyToImport || 0
+      );
+
+      if (readyToImport <= 0) {
+        return;
+      }
+
+      const shouldImport = window.confirm(
+        `Import ${readyToImport} confirmed spreadsheet bookings into the CRM?\n\nPending-payment rows will remain excluded. Google Calendar events will not be created or deleted.`
+      );
+
+      if (!shouldImport) {
+        return;
+      }
+
+      try {
+        setIsImportingHistory(true);
+        setHistoryError("");
+        setHistoryImportMessage("");
+
+        const response = await fetch(
+          "/api/admin-booking-import-preview",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              "x-admin-pin": adminPin,
+            },
+            body: JSON.stringify({
+              action:
+                "import_confirmed_history",
+              confirmation:
+                "IMPORT_CONFIRMED_HISTORY",
+            }),
+          }
+        );
+        const data =
+          await readJsonResponse(response);
+
+        if (!response.ok || !data.ok) {
+          throw new Error(
+            data.error ||
+              "Confirmed history could not be imported."
+          );
+        }
+
+        await Promise.all([
+          loadHistoryPreview(),
+          loadBookings(),
+          loadCalendarSync(),
+        ]);
+
+        setHistoryImportMessage(
+          `${data.inserted || 0} confirmed bookings imported. ${data.skippedExisting || 0} existing CRM bookings were left unchanged. ${data.pendingExcluded || 0} pending-payment rows remain excluded.`
+        );
+      } catch (historyImportError) {
+        console.error(
+          "Confirmed history import failed:",
+          historyImportError
+        );
+        setHistoryError(
+          historyImportError.message
+        );
+      } finally {
+        setIsImportingHistory(false);
+      }
+    },
+    [
+      adminPin,
+      historyPreview,
+      loadBookings,
+      loadCalendarSync,
+      loadHistoryPreview,
+    ]
   );
 
   const bookingsByDate = useMemo(() => {
@@ -780,12 +865,36 @@ function CalendarTab({
               <span>Spreadsheet reconciliation</span>
               <h3>Historical booking preview</h3>
               <p>
-                Preview only — no bookings or Google
-                Calendar events have been changed.
+                Confirmed rows can be imported safely.
+                Pending-payment rows remain excluded.
               </p>
             </div>
 
             <div className="crm-calendar-history-actions">
+              <button
+                type="button"
+                className="is-import"
+                onClick={importConfirmedHistory}
+                disabled={
+                  isImportingHistory ||
+                  isLoadingHistory ||
+                  !historyPreview?.summary
+                    ?.readyToImport
+                }
+              >
+                {isImportingHistory ? (
+                  <RefreshCw
+                    size={14}
+                    className="is-spinning"
+                  />
+                ) : (
+                  <Plus size={14} />
+                )}
+                {isImportingHistory
+                  ? "Importing..."
+                  : `Import ${historyPreview?.summary?.readyToImport || 0} confirmed`}
+              </button>
+
               <button
                 type="button"
                 onClick={loadHistoryPreview}
@@ -808,6 +917,7 @@ function CalendarTab({
                 onClick={() => {
                   setHistoryPreview(null);
                   setHistoryError("");
+                  setHistoryImportMessage("");
                 }}
                 aria-label="Close history preview"
               >
@@ -819,6 +929,12 @@ function CalendarTab({
           {historyError && (
             <div className="crm-calendar-history-error">
               {historyError}
+            </div>
+          )}
+
+          {historyImportMessage && (
+            <div className="crm-calendar-history-success">
+              {historyImportMessage}
             </div>
           )}
 
@@ -861,6 +977,13 @@ function CalendarTab({
                     <strong>
                       {historyPreview.summary
                         ?.missingCalendar || 0}
+                    </strong>
+                  </div>
+                  <div className="is-warning">
+                    <span>Pending decision</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.pendingPaymentReview || 0}
                     </strong>
                   </div>
                   <div className="is-danger">

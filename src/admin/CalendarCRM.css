@@ -268,6 +268,16 @@
   padding: 0;
 }
 
+.crm-calendar-history-actions .is-import {
+  border-color: #181512;
+  background: #181512;
+  color: #ffffff;
+}
+
+.crm-calendar-history-actions .is-import:hover:not(:disabled) {
+  background: #2b2723;
+}
+
 .crm-calendar-history-error {
   margin: 15px 19px 0;
   padding: 11px 13px;
@@ -275,6 +285,16 @@
   border-radius: 9px;
   background: var(--crm-red-soft);
   color: var(--crm-red);
+  font-size: 10px;
+}
+
+.crm-calendar-history-success {
+  margin: 15px 19px 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(40, 115, 77, 0.16);
+  border-radius: 9px;
+  background: var(--crm-green-soft);
+  color: var(--crm-green);
   font-size: 10px;
 }
 
@@ -290,7 +310,7 @@
 
 .crm-calendar-history-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   padding: 15px 19px;
   border-bottom: 1px solid var(--crm-border);
@@ -396,7 +416,8 @@
 .crm-calendar-history-result.is-missing_crm,
 .crm-calendar-history-result.is-missing_calendar,
 .crm-calendar-history-result.is-missing_both,
-.crm-calendar-history-result.is-calendar_mismatch {
+.crm-calendar-history-result.is-calendar_mismatch,
+.crm-calendar-history-result.is-pending_payment_review {
   background: var(--crm-orange-soft);
   color: #8a5b17;
 }

@@ -113,6 +113,174 @@ function isInactiveStatus(value) {
   );
 }
 
+function isConfirmedSheetStatus(value) {
+  const status = cleanText(value).toUpperCase();
+
+  return (
+    status === "PAID / CONFIRMED" ||
+    status === "MANUAL / CONFIRMED"
+  );
+}
+
+function isPendingPaymentStatus(value) {
+  return cleanText(value)
+    .toUpperCase()
+    .includes("PENDING");
+}
+
+function getSheetField(row, name) {
+  return cleanText(row?.fields?.[name]);
+}
+
+function parseCurrency(value) {
+  const text = cleanText(value).replace(
+    /[^0-9.-]/g,
+    ""
+  );
+  const amount = Number(text || 0);
+
+  return Number.isFinite(amount)
+    ? Math.round(amount * 100) / 100
+    : 0;
+}
+
+function getPaymentDetails(row) {
+  const packagePrice = parseCurrency(
+    getSheetField(row, "Package Price")
+  );
+  const remainingBalance = parseCurrency(
+    getSheetField(row, "Remaining Balance")
+  );
+  const paidOnline = parseCurrency(
+    getSheetField(row, "Paid Online")
+  );
+  const amountPaid = Math.max(
+    0,
+    Math.min(
+      packagePrice,
+      packagePrice > 0
+        ? packagePrice - remainingBalance
+        : paidOnline
+    )
+  );
+
+  let paymentStatus = "PAY_IN_STUDIO";
+
+  if (
+    packagePrice > 0 &&
+    remainingBalance <= 0
+  ) {
+    paymentStatus = "PAID";
+  } else if (amountPaid > 0) {
+    paymentStatus = "PARTIAL";
+  }
+
+  return {
+    packagePrice,
+    amountPaid,
+    remainingBalance,
+    paymentStatus,
+  };
+}
+
+function getShootDetails(row, date, time) {
+  const shootStatus = getSheetField(
+    row,
+    "Shoot Status"
+  ).toUpperCase();
+  const softCopiesStatus = getSheetField(
+    row,
+    "Soft Copies Status"
+  ).toUpperCase();
+  const isCompleted =
+    shootStatus === "DONE" ||
+    shootStatus === "COMPLETED";
+
+  let postProductionStatus = "NOT_STARTED";
+
+  if (softCopiesStatus === "SENT") {
+    postProductionStatus = "DELIVERED";
+  } else if (
+    softCopiesStatus === "EDITING" ||
+    isCompleted
+  ) {
+    postProductionStatus = "FOR_EDITING";
+  }
+
+  return {
+    shootStatus: isCompleted
+      ? "COMPLETED"
+      : "SCHEDULED",
+    shootCompletedAt: isCompleted
+      ? new Date(
+          `${date}T${time}:00+08:00`
+        ).toISOString()
+      : null,
+    postProductionStatus,
+  };
+}
+
+function getBookingSource(row) {
+  const reference = normalizeReference(
+    row.bookingReference
+  );
+
+  if (reference.includes("-O-")) {
+    return "WEBSITE";
+  }
+
+  if (reference.includes("-M-")) {
+    return "ADMIN";
+  }
+
+  return cleanText(row.status)
+    .toUpperCase()
+    .startsWith("MANUAL")
+    ? "ADMIN"
+    : "WEBSITE";
+}
+
+function getImportedCreatedAt(row) {
+  const timestamp = getSheetField(
+    row,
+    "Timestamp"
+  );
+  const parsedTimestamp = new Date(timestamp);
+
+  if (
+    timestamp &&
+    !Number.isNaN(parsedTimestamp.getTime())
+  ) {
+    return parsedTimestamp.toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
+function buildInternalNotes(row) {
+  const details = [
+    `Imported from Bookings / Sales row ${row.rowNumber}.`,
+  ];
+  const mappedFields = [
+    ["Staff", "Staff Assigned"],
+    ["Shoot status", "Shoot Status"],
+    ["Balance status", "Balance Status"],
+    ["Soft copies", "Soft Copies Status"],
+    ["Receipt", "Receipt / Invoice Number"],
+    ["Remarks", "Remarks"],
+  ];
+
+  mappedFields.forEach(([label, field]) => {
+    const value = getSheetField(row, field);
+
+    if (value) {
+      details.push(`${label}: ${value}`);
+    }
+  });
+
+  return details.join("\n");
+}
+
 function extractReferenceFromTitle(value) {
   const title = cleanText(value);
   const firstSegment = cleanText(
@@ -339,6 +507,312 @@ function getManilaDateTimeKey(value) {
   return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
 }
 
+function indexCalendarEvents(calendarEvents) {
+  const byId = new Map();
+  const byReference = new Map();
+
+  calendarEvents.forEach((event) => {
+    const eventId = normalizeEventId(
+      event.eventId
+    );
+    const reference = normalizeReference(
+      event.bookingReference ||
+        extractReferenceFromTitle(event.title)
+    );
+
+    if (eventId) {
+      byId.set(eventId, event);
+    }
+
+    if (reference) {
+      byReference.set(reference, event);
+    }
+  });
+
+  return { byId, byReference };
+}
+
+function findCalendarEvent(row, calendarIndex) {
+  const eventId = normalizeEventId(
+    row.calendarEventId
+  );
+  const reference = normalizeReference(
+    row.bookingReference
+  );
+
+  return (
+    (eventId && calendarIndex.byId.get(eventId)) ||
+    (reference &&
+      calendarIndex.byReference.get(reference)) ||
+    null
+  );
+}
+
+function buildConfirmedImportRecords(
+  sheetRows,
+  crmBookings,
+  calendarEvents
+) {
+  const existingReferences = new Set();
+  const occupiedSlots = new Map();
+  const calendarIndex =
+    indexCalendarEvents(calendarEvents);
+  const importSlots = new Map();
+  const records = [];
+  let skippedExisting = 0;
+  let pendingExcluded = 0;
+
+  crmBookings.forEach((booking) => {
+    const reference = normalizeReference(
+      booking.booking_reference
+    );
+    const date = normalizeDate(
+      booking.shoot_date
+    );
+    const time = normalizeTime(
+      booking.shoot_time
+    );
+
+    if (reference) {
+      existingReferences.add(reference);
+    }
+
+    if (
+      date &&
+      time &&
+      !isInactiveStatus(
+        booking.booking_status
+      )
+    ) {
+      occupiedSlots.set(
+        `${date}T${time}`,
+        reference
+      );
+    }
+  });
+
+  sheetRows.forEach((row) => {
+    if (isPendingPaymentStatus(row.status)) {
+      pendingExcluded += 1;
+      return;
+    }
+
+    if (!isConfirmedSheetStatus(row.status)) {
+      return;
+    }
+
+    const reference = normalizeReference(
+      row.bookingReference
+    );
+    const clientName = cleanText(row.clientName);
+    const packageTitle = cleanText(
+      row.packageTitle
+    );
+    const date = normalizeDate(row.shootDate);
+    const time = normalizeTime(row.shootTime);
+
+    if (
+      !reference ||
+      !clientName ||
+      !packageTitle ||
+      !date ||
+      !time
+    ) {
+      const error = new Error(
+        `Spreadsheet row ${row.rowNumber} is missing required booking details.`
+      );
+      error.status = 409;
+      throw error;
+    }
+
+    if (existingReferences.has(reference)) {
+      skippedExisting += 1;
+      return;
+    }
+
+    const slotKey = `${date}T${time}`;
+    const existingSlotReference =
+      occupiedSlots.get(slotKey);
+
+    if (
+      existingSlotReference &&
+      existingSlotReference !== reference
+    ) {
+      const error = new Error(
+        `The ${date} ${time} slot is already assigned to another CRM booking.`
+      );
+      error.status = 409;
+      throw error;
+    }
+
+    if (
+      importSlots.has(slotKey) &&
+      importSlots.get(slotKey) !== reference
+    ) {
+      const error = new Error(
+        `The spreadsheet contains more than one active booking for ${date} ${time}.`
+      );
+      error.status = 409;
+      throw error;
+    }
+
+    const calendarEvent = findCalendarEvent(
+      row,
+      calendarIndex
+    );
+
+    if (!calendarEvent) {
+      const error = new Error(
+        `Confirmed spreadsheet row ${row.rowNumber} does not have a matching Google Calendar event.`
+      );
+      error.status = 409;
+      throw error;
+    }
+
+    const payment = getPaymentDetails(row);
+    const shoot = getShootDetails(
+      row,
+      date,
+      time
+    );
+    const paymentMethod = getSheetField(
+      row,
+      "Payment Method"
+    );
+    const paymentReference =
+      getSheetField(
+        row,
+        "Last Payment Reference"
+      ) ||
+      getSheetField(
+        row,
+        "Payment Reference"
+      ) ||
+      getSheetField(
+        row,
+        "PayMongo Reference"
+      );
+
+    importSlots.set(slotKey, reference);
+
+    records.push({
+      created_at: getImportedCreatedAt(row),
+      booking_reference: reference,
+      client_name: clientName,
+      email: cleanText(row.email) || null,
+      phone: cleanText(row.phone) || null,
+      package_title: packageTitle,
+      package_price: payment.packagePrice,
+      shoot_date: date,
+      shoot_time: time,
+      payment_status: payment.paymentStatus,
+      amount_paid: payment.amountPaid,
+      remaining_balance:
+        payment.remainingBalance,
+      booking_status: "CONFIRMED",
+      notes:
+        getSheetField(row, "Notes") || null,
+      calendar_event_id:
+        normalizeEventId(
+          calendarEvent.eventId ||
+            row.calendarEventId
+        ) || null,
+      calendar_status: "SYNCED",
+      package_type: "STANDARD",
+      original_package_title: packageTitle,
+      price_overridden: false,
+      booking_source: getBookingSource(row),
+      internal_notes: buildInternalNotes(row),
+      shoot_status: shoot.shootStatus,
+      shoot_completed_at:
+        shoot.shootCompletedAt,
+      post_production_status:
+        shoot.postProductionStatus,
+      delivered_at: null,
+      payment_provider:
+        paymentMethod || null,
+      payment_reference:
+        paymentReference || null,
+      payment_option: "HISTORICAL_IMPORT",
+    });
+  });
+
+  return {
+    records,
+    skippedExisting,
+    pendingExcluded,
+  };
+}
+
+async function insertConfirmedHistory(
+  sheetRows,
+  crmBookings,
+  calendarEvents
+) {
+  const {
+    records,
+    skippedExisting,
+    pendingExcluded,
+  } = buildConfirmedImportRecords(
+    sheetRows,
+    crmBookings,
+    calendarEvents
+  );
+
+  if (records.length === 0) {
+    return {
+      inserted: 0,
+      skippedExisting,
+      pendingExcluded,
+    };
+  }
+
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/manual_bookings?on_conflict=booking_reference`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization:
+          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer:
+          "resolution=ignore-duplicates,return=representation",
+      },
+      body: JSON.stringify(records),
+    }
+  );
+
+  const text = await response.text();
+  let data;
+
+  try {
+    data = text ? JSON.parse(text) : [];
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.code === "23505"
+        ? "A date and time was taken before the import completed. No historical bookings were imported."
+        : data?.message ||
+            "The confirmed booking history could not be imported."
+    );
+    error.status =
+      data?.code === "23505" ? 409 : 500;
+    throw error;
+  }
+
+  return {
+    inserted: Array.isArray(data)
+      ? data.length
+      : records.length,
+    skippedExisting,
+    pendingExcluded,
+  };
+}
+
 function buildPreview(
   sheetRows,
   crmBookings,
@@ -451,6 +925,11 @@ function buildPreview(
     } else if (duplicateSlot) {
       code = "duplicate_slot";
       label = "Duplicate active time slot";
+    } else if (
+      isPendingPaymentStatus(row.status)
+    ) {
+      code = "pending_payment_review";
+      label = "Pending payment — excluded from import";
     } else if (!crmBooking && !calendarEvent) {
       code = "missing_both";
       label = inactive
@@ -518,6 +997,13 @@ function buildPreview(
       mismatchedCalendar: count([
         "calendar_mismatch",
       ]),
+      pendingPaymentReview: count([
+        "pending_payment_review",
+      ]),
+      readyToImport: count([
+        "missing_crm",
+        "missing_both",
+      ]),
       needsReview: count([
         "incomplete",
         "duplicate_reference",
@@ -544,7 +1030,10 @@ export default async function handler(
       return;
     }
 
-    if (request.method !== "GET") {
+    if (
+      request.method !== "GET" &&
+      request.method !== "POST"
+    ) {
       return sendJson(response, 405, {
         error: "Method not allowed.",
       });
@@ -571,11 +1060,67 @@ export default async function handler(
     const calendarEvents =
       await fetchCalendarEvents(sheetRows);
 
+    if (request.method === "POST") {
+      const action = cleanText(
+        request.body?.action
+      );
+      const confirmation = cleanText(
+        request.body?.confirmation
+      );
+
+      if (
+        action !==
+        "import_confirmed_history"
+      ) {
+        return sendJson(response, 400, {
+          error: "Invalid import action.",
+        });
+      }
+
+      if (
+        confirmation !==
+        "IMPORT_CONFIRMED_HISTORY"
+      ) {
+        return sendJson(response, 400, {
+          error:
+            "Historical import confirmation is missing.",
+        });
+      }
+
+      const importResult =
+        await insertConfirmedHistory(
+          sheetRows,
+          crmBookings,
+          calendarEvents
+        );
+
+      response.setHeader(
+        "Cache-Control",
+        "no-store"
+      );
+
+      return sendJson(response, 200, {
+        ok: true,
+        ...importResult,
+      });
+    }
+
     const preview = buildPreview(
       sheetRows,
       crmBookings,
       calendarEvents
     );
+    const importPlan =
+      buildConfirmedImportRecords(
+        sheetRows,
+        crmBookings,
+        calendarEvents
+      );
+
+    preview.summary.readyToImport =
+      importPlan.records.length;
+    preview.summary.pendingPaymentReview =
+      importPlan.pendingExcluded;
 
     response.setHeader(
       "Cache-Control",
@@ -593,10 +1138,14 @@ export default async function handler(
       error
     );
 
-    return sendJson(response, 500, {
+    return sendJson(
+      response,
+      Number(error.status || 500),
+      {
       error:
         error.message ||
         "Historical booking preview failed.",
-    });
+      }
+    );
   }
 }
