@@ -12,6 +12,7 @@ import AdminSidebar from "./admin/components/AdminSidebar";
 import AdminTopbar from "./admin/components/AdminTopbar";
 
 import DashboardTab from "./admin/DashboardTab";
+import CalendarTab from "./admin/CalendarTab";
 import BookingsTab from "./admin/BookingsTab";
 import DiscountCodesTab from "./admin/DiscountCodesTab";
 import PackagesTab from "./admin/PackagesTab";
@@ -23,6 +24,12 @@ const PAGE_DETAILS = {
     title: "Dashboard",
     description:
       "A clear view of your studio bookings, payments, customers, and daily activity.",
+  },
+
+  Calendar: {
+    title: "Studio Calendar",
+    description:
+      "See every studio booking and payment status in one schedule.",
   },
 
   Bookings: {
@@ -244,6 +251,15 @@ function Admin() {
           <section className="crm-page-body">
             {activeTab === "Dashboard" && (
               <DashboardTab
+                onNavigate={setActiveTab}
+                onCreateBooking={
+                  openNewBooking
+                }
+              />
+            )}
+
+            {activeTab === "Calendar" && (
+              <CalendarTab
                 onNavigate={setActiveTab}
                 onCreateBooking={
                   openNewBooking

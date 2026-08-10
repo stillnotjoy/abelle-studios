@@ -27,7 +27,7 @@ const NAVIGATION_GROUPS = [
       {
         label: "Calendar",
         icon: CalendarDays,
-        enabled: false,
+        enabled: true,
       },
     ],
   },
