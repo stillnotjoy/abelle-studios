@@ -1,15 +1,12 @@
 // api/admin-manual-bookings.js
 
+import { requireAdmin } from "../server/adminAuth.js";
+
 const SUPABASE_URL =
   process.env.SUPABASE_URL;
 
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const ADMIN_PIN =
-  process.env.ADMIN_DISCOUNT_PIN ||
-  process.env.ADMIN_PIN ||
-  "1234";
 
 const ALLOWED_BOOKING_TIMES = [
   "09:00",
@@ -44,32 +41,6 @@ function roundCurrency(value) {
     Math.round(Number(value || 0) * 100) /
     100
   );
-}
-
-function requireAdmin(req, res) {
-  const pinFromHeader =
-    req.headers["x-admin-pin"];
-
-  if (!ADMIN_PIN) {
-    sendJson(res, 500, {
-      error: "ADMIN_PIN is not configured.",
-    });
-
-    return false;
-  }
-
-  if (
-    !pinFromHeader ||
-    pinFromHeader !== ADMIN_PIN
-  ) {
-    sendJson(res, 401, {
-      error: "Unauthorized admin request.",
-    });
-
-    return false;
-  }
-
-  return true;
 }
 
 function getShootCode(packageTitle) {
@@ -668,7 +639,7 @@ export default async function handler(
   res
 ) {
   try {
-    if (!requireAdmin(req, res)) {
+    if (!(await requireAdmin(req, res))) {
       return;
     }
 

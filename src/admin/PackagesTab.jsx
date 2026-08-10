@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 
 const EMPTY_FORM = {
   name: "",
@@ -32,14 +32,10 @@ function PackagesTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [updatingPackageId, setUpdatingPackageId] = useState(null);
   const [editingPackageId, setEditingPackageId] = useState(null);
-  const adminPin = getSavedAdminPin();
-
   const loadPackages = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/admin-packages", {
-        headers: { "x-admin-pin": adminPin },
-      });
+      const response = await adminFetch("/api/admin-packages");
       const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || "Could not load packages.");
       setPackages(data.packages || []);
@@ -111,11 +107,10 @@ const savePackage = async (event) => {
   try {
     setIsSaving(true);
 
-    const response = await fetch("/api/admin-packages", {
+    const response = await adminFetch("/api/admin-packages", {
       method: isEditing ? "PATCH" : "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-pin": adminPin,
       },
       body: JSON.stringify(
         isEditing
@@ -165,11 +160,10 @@ const savePackage = async (event) => {
 
     try {
       setUpdatingPackageId(pkg.id);
-      const response = await fetch("/api/admin-packages", {
+      const response = await adminFetch("/api/admin-packages", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-pin": adminPin,
         },
         body: JSON.stringify({ id: pkg.id, isActive: nextStatus }),
       });
@@ -200,11 +194,10 @@ const savePackage = async (event) => {
   try {
     setUpdatingPackageId(pkg.id);
 
-    const response = await fetch("/api/admin-packages", {
+    const response = await adminFetch("/api/admin-packages", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-pin": adminPin,
       },
       body: JSON.stringify({
         id: pkg.id,

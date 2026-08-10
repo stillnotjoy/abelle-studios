@@ -19,7 +19,7 @@ import {
   useState,
 } from "react";
 
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 import "./CalendarCRM.css";
 
 const WEEKDAYS = [
@@ -214,21 +214,15 @@ function CalendarTab({
     useState(false);
   const [historyImportMessage, setHistoryImportMessage] =
     useState("");
-  const adminPin = getSavedAdminPin();
-
   const loadBookings = useCallback(
     async () => {
       try {
         setIsLoading(true);
         setError("");
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
-          {
-            headers: {
-              "x-admin-pin": adminPin,
-            },
-          }
+          {}
         );
         const data =
           await readJsonResponse(response);
@@ -255,7 +249,7 @@ function CalendarTab({
         setIsLoading(false);
       }
     },
-    [adminPin]
+    []
   );
 
   useEffect(() => {
@@ -278,13 +272,9 @@ function CalendarTab({
             end: range.end,
           });
 
-        const response = await fetch(
+        const response = await adminFetch(
           `/api/admin-calendar-sync?${query.toString()}`,
-          {
-            headers: {
-              "x-admin-pin": adminPin,
-            },
-          }
+          {}
         );
         const data =
           await readJsonResponse(response);
@@ -316,7 +306,7 @@ function CalendarTab({
         setIsCheckingSync(false);
       }
     },
-    [adminPin, month]
+    [month]
   );
 
   useEffect(() => {
@@ -331,13 +321,9 @@ function CalendarTab({
         setIsLoadingHistory(true);
         setHistoryError("");
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-booking-import-preview",
-          {
-            headers: {
-              "x-admin-pin": adminPin,
-            },
-          }
+          {}
         );
         const data =
           await readJsonResponse(response);
@@ -362,7 +348,7 @@ function CalendarTab({
         setIsLoadingHistory(false);
       }
     },
-    [adminPin]
+    []
   );
 
   const importConfirmedHistory = useCallback(
@@ -389,14 +375,13 @@ function CalendarTab({
         setHistoryError("");
         setHistoryImportMessage("");
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-booking-import-preview",
           {
             method: "POST",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin": adminPin,
             },
             body: JSON.stringify({
               action:
@@ -438,7 +423,6 @@ function CalendarTab({
       }
     },
     [
-      adminPin,
       historyPreview,
       loadBookings,
       loadCalendarSync,

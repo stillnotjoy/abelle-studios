@@ -18,7 +18,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 import "./BookingsCRM.css";
 
 const MANUAL_BOOKING_SLOTS = [
@@ -261,9 +261,6 @@ function BookingsTab({
   const [slotError, setSlotError] =
     useState("");
 
-  const adminPin =
-    getSavedAdminPin();
-
   const activePackages = useMemo(
     () =>
       packages.filter(
@@ -423,13 +420,9 @@ function BookingsTab({
     try {
       setIsLoadingPackages(true);
 
-      const response = await fetch(
+      const response = await adminFetch(
         "/api/admin-packages",
-        {
-          headers: {
-            "x-admin-pin": adminPin,
-          },
-        }
+        {}
       );
 
       const data =
@@ -495,13 +488,9 @@ function BookingsTab({
     try {
       setIsLoading(true);
 
-      const response = await fetch(
+      const response = await adminFetch(
         "/api/admin-manual-bookings",
-        {
-          headers: {
-            "x-admin-pin": adminPin,
-          },
-        }
+        {}
       );
 
       const data =
@@ -845,15 +834,13 @@ function BookingsTab({
       try {
         setIsSaving(true);
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "POST",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin":
-                adminPin,
             },
             body: JSON.stringify({
               clientName:
@@ -966,15 +953,13 @@ function BookingsTab({
     try {
       setIsRecordingPayment(true);
 
-      const response = await fetch(
+      const response = await adminFetch(
         "/api/admin-manual-bookings",
         {
           method: "PATCH",
           headers: {
             "Content-Type":
               "application/json",
-            "x-admin-pin":
-              adminPin,
           },
           body: JSON.stringify({
             id:
@@ -1053,15 +1038,13 @@ function BookingsTab({
           booking.id
         );
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "POST",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin":
-                adminPin,
             },
             body: JSON.stringify({
               action:
@@ -1145,7 +1128,7 @@ function BookingsTab({
           booking.id
         );
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "POST",
@@ -1154,8 +1137,6 @@ function BookingsTab({
               "Content-Type":
                 "application/json",
 
-              "x-admin-pin":
-                adminPin,
             },
 
             body: JSON.stringify({
@@ -1239,15 +1220,13 @@ function BookingsTab({
           booking.id
         );
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "DELETE",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin":
-                adminPin,
             },
             body: JSON.stringify({
               id: booking.id,

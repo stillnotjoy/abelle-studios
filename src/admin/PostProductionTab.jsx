@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 
 import "./PostProductionCRM.css";
 
@@ -161,20 +161,14 @@ function PostProductionTab() {
   const [dueDateDrafts, setDueDateDrafts] =
     useState({});
 
-  const adminPin = getSavedAdminPin();
-
   const loadBookings = useCallback(async () => {
     setIsLoading(true);
     setError("");
 
     try {
-      const response = await fetch(
+      const response = await adminFetch(
         "/api/admin-manual-bookings",
-        {
-          headers: {
-            "x-admin-pin": adminPin,
-          },
-        }
+        {}
       );
 
       const data =
@@ -213,7 +207,7 @@ function PostProductionTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [adminPin]);
+  }, []);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(
@@ -347,14 +341,13 @@ function PostProductionTab() {
       try {
         setWorkingBookingId(booking.id);
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "POST",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin": adminPin,
             },
             body: JSON.stringify({
               action:
@@ -415,14 +408,13 @@ function PostProductionTab() {
       try {
         setWorkingBookingId(booking.id);
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
             method: "POST",
             headers: {
               "Content-Type":
                 "application/json",
-              "x-admin-pin": adminPin,
             },
             body: JSON.stringify({
               action:

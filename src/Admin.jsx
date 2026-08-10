@@ -6,8 +6,6 @@ import "./AdminCRM.css";
 import { supabase } from "./lib/supabaseClient";
 import AdminLogin from "./admin/AdminLogin";
 
-import { getSavedAdminPin } from "./admin/adminConfig";
-
 import AdminSidebar from "./admin/components/AdminSidebar";
 import AdminTopbar from "./admin/components/AdminTopbar";
 
@@ -91,15 +89,6 @@ function Admin() {
     shouldOpenBookingForm,
     setShouldOpenBookingForm,
   ] = useState(false);
-
-  /*
-   * Keep the legacy admin PIN available
-   * temporarily because the current admin
-   * API routes still use x-admin-pin.
-   */
-  useEffect(() => {
-    getSavedAdminPin();
-  }, []);
 
   /*
    * Check whether the administrator already

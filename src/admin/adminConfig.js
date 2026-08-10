@@ -1,5 +1,3 @@
-export const ADMIN_PIN_FALLBACK = "1234";
-
 export const MANUAL_BOOKING_PACKAGES = [
   { title: "Personal Portraits", price: 499 },
   { title: "Duo Portraits", price: 899 },
@@ -24,11 +22,3 @@ export const ADMIN_TABS = [
   "Blocked Dates",
   "Settings",
 ];
-
-export function getSavedAdminPin() {
-  if (typeof window === "undefined") return ADMIN_PIN_FALLBACK;
-  const savedPin = localStorage.getItem("abelleAdminPin");
-  if (savedPin) return savedPin;
-  localStorage.setItem("abelleAdminPin", ADMIN_PIN_FALLBACK);
-  return ADMIN_PIN_FALLBACK;
-}

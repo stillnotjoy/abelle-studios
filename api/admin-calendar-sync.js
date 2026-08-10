@@ -1,9 +1,6 @@
 /* global process */
 
-const ADMIN_PIN =
-  process.env.ADMIN_DISCOUNT_PIN ||
-  process.env.ADMIN_PIN ||
-  "1234";
+import { requireAdmin } from "../server/adminAuth.js";
 
 const GOOGLE_APPS_SCRIPT_URL =
   process.env.GOOGLE_APPS_SCRIPT_URL;
@@ -13,30 +10,6 @@ const GOOGLE_APPS_SCRIPT_SECRET =
 
 function sendJson(response, status, data) {
   return response.status(status).json(data);
-}
-
-function requireAdmin(request, response) {
-  const pinFromHeader =
-    request.headers["x-admin-pin"];
-
-  if (!ADMIN_PIN) {
-    sendJson(response, 500, {
-      error: "ADMIN_PIN is not configured.",
-    });
-    return false;
-  }
-
-  if (
-    !pinFromHeader ||
-    pinFromHeader !== ADMIN_PIN
-  ) {
-    sendJson(response, 401, {
-      error: "Unauthorized admin request.",
-    });
-    return false;
-  }
-
-  return true;
 }
 
 function isValidDate(value) {
@@ -50,7 +23,7 @@ export default async function handler(
   response
 ) {
   try {
-    if (!requireAdmin(request, response)) {
+    if (!(await requireAdmin(request, response))) {
       return;
     }
 

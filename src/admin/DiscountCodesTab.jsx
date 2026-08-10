@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 
 function DiscountCodesTab() {
   const [discounts, setDiscounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({ code: "", description: "", discountType: "fixed", discountValue: "", isActive: true, startsAt: "", endsAt: "", maxTotalUses: "", oneUsePerCustomer: false });
-  const adminPin = getSavedAdminPin();
-
   const loadDiscounts = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/admin-discounts", { headers: { "x-admin-pin": adminPin } });
+      const response = await adminFetch("/api/admin-discounts");
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not load discount codes.");
       setDiscounts(data.discounts || []);
@@ -27,7 +25,7 @@ function DiscountCodesTab() {
   const saveDiscount = async (event) => {
     event.preventDefault();
     try {
-      const response = await fetch("/api/admin-discounts", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-pin": adminPin }, body: JSON.stringify(form) });
+      const response = await adminFetch("/api/admin-discounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save discount code.");
       setForm({ code: "", description: "", discountType: "fixed", discountValue: "", isActive: true, startsAt: "", endsAt: "", maxTotalUses: "", oneUsePerCustomer: false });

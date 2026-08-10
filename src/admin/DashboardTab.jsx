@@ -21,7 +21,7 @@ import {
   useState,
 } from "react";
 
-import { getSavedAdminPin } from "./adminConfig";
+import { adminFetch } from "./adminApi";
 
 function readJsonResponse(response) {
   return response.text().then((text) => {
@@ -223,9 +223,6 @@ function DashboardTab({
   const [error, setError] =
     useState("");
 
-  const adminPin =
-    getSavedAdminPin();
-
   const currentDate = new Date();
 
   const currentHour =
@@ -255,13 +252,9 @@ function DashboardTab({
         setIsLoading(true);
         setError("");
 
-        const response = await fetch(
+        const response = await adminFetch(
           "/api/admin-manual-bookings",
-          {
-            headers: {
-              "x-admin-pin": adminPin,
-            },
-          }
+          {}
         );
 
         const data =
@@ -292,7 +285,7 @@ function DashboardTab({
         setIsLoading(false);
       }
     },
-    [adminPin]
+    []
   );
 
   useEffect(() => {
