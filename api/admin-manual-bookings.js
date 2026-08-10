@@ -789,6 +789,242 @@ export default async function handler(
             "Shoot marked complete and moved to For Editing.",
         });
       }
+
+      /*
+       * POST-PRODUCTION WORKFLOW
+       *
+       * Keeps the editing queue in a strict,
+       * predictable order:
+       *
+       * FOR_EDITING -> READY_FOR_DELIVERY
+       * -> DELIVERED
+       *
+       * A ready booking may also be returned
+       * to editing when more work is needed.
+       */
+      if (
+        cleanText(body.action) ===
+        "update_post_production"
+      ) {
+        const bookingId =
+          cleanText(body.id);
+
+        const nextStatus =
+          cleanText(body.status)
+            .toUpperCase();
+
+        const editingDueDate =
+          cleanText(
+            body.editing_due_date
+          );
+
+        const allowedStatuses = [
+          "FOR_EDITING",
+          "READY_FOR_DELIVERY",
+          "DELIVERED",
+        ];
+
+        if (!bookingId) {
+          return sendJson(res, 400, {
+            error:
+              "Manual booking ID is required.",
+          });
+        }
+
+        if (
+          !allowedStatuses.includes(
+            nextStatus
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "A valid post-production status is required.",
+          });
+        }
+
+        if (editingDueDate) {
+          const dateMatch =
+            editingDueDate.match(
+              /^(\d{4})-(\d{2})-(\d{2})$/
+            );
+
+          const parsedDate = dateMatch
+            ? new Date(
+                `${editingDueDate}T00:00:00Z`
+              )
+            : null;
+
+          if (
+            !dateMatch ||
+            Number.isNaN(
+              parsedDate.getTime()
+            ) ||
+            parsedDate
+              .toISOString()
+              .slice(0, 10) !==
+              editingDueDate
+          ) {
+            return sendJson(res, 400, {
+              error:
+                "Editing due date must be a valid date.",
+            });
+          }
+        }
+
+        const manualBooking =
+          await getManualBookingById(
+            bookingId
+          );
+
+        if (!manualBooking) {
+          return sendJson(res, 404, {
+            error:
+              "Manual booking not found.",
+          });
+        }
+
+        if (
+          manualBooking.shoot_status !==
+          "COMPLETED"
+        ) {
+          return sendJson(res, 409, {
+            error:
+              "Mark the shoot complete before starting post-production.",
+          });
+        }
+
+        const currentStatus =
+          cleanText(
+            manualBooking.post_production_status
+          ).toUpperCase() ||
+          "FOR_EDITING";
+
+        const allowedTransitions = {
+          FOR_EDITING: [
+            "FOR_EDITING",
+            "READY_FOR_DELIVERY",
+          ],
+          READY_FOR_DELIVERY: [
+            "FOR_EDITING",
+            "READY_FOR_DELIVERY",
+            "DELIVERED",
+          ],
+          DELIVERED: ["DELIVERED"],
+        };
+
+        if (
+          !(
+            allowedTransitions[
+              currentStatus
+            ] || []
+          ).includes(nextStatus)
+        ) {
+          return sendJson(res, 409, {
+            error:
+              "This booking cannot skip its current post-production step.",
+          });
+        }
+
+        if (
+          nextStatus ===
+            "READY_FOR_DELIVERY" &&
+          !cleanText(
+            manualBooking.client_drive_folder_url
+          )
+        ) {
+          return sendJson(res, 409, {
+            error:
+              "Create or connect the client Drive folder before marking files ready.",
+          });
+        }
+
+        const now =
+          new Date().toISOString();
+
+        const updatePayload = {
+          post_production_status:
+            nextStatus,
+          editing_due_date:
+            editingDueDate || null,
+        };
+
+        if (
+          nextStatus ===
+          "READY_FOR_DELIVERY"
+        ) {
+          updatePayload.ready_to_upload_at =
+            currentStatus ===
+            "READY_FOR_DELIVERY"
+              ? manualBooking.ready_to_upload_at ||
+                now
+              : now;
+
+          updatePayload.delivered_at =
+            null;
+        }
+
+        if (
+          nextStatus === "DELIVERED"
+        ) {
+          updatePayload.delivered_at =
+            manualBooking.delivered_at ||
+            now;
+        }
+
+        if (
+          nextStatus ===
+            "FOR_EDITING" &&
+          currentStatus ===
+            "READY_FOR_DELIVERY"
+        ) {
+          updatePayload.ready_to_upload_at =
+            null;
+          updatePayload.delivered_at =
+            null;
+        }
+
+        const encodedBookingId =
+          encodeURIComponent(
+            bookingId
+          );
+
+        const updated =
+          await supabaseRequest(
+            `manual_bookings?id=eq.${encodedBookingId}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify(
+                updatePayload
+              ),
+            }
+          );
+
+        if (!updated?.length) {
+          return sendJson(res, 404, {
+            error:
+              "The post-production update could not be saved.",
+          });
+        }
+
+        const statusMessages = {
+          FOR_EDITING:
+            currentStatus ===
+            "READY_FOR_DELIVERY"
+              ? "Booking returned to the editing queue."
+              : "Editing deadline saved.",
+          READY_FOR_DELIVERY:
+            "Files marked ready for delivery.",
+          DELIVERED:
+            "Client delivery marked complete.",
+        };
+
+        return sendJson(res, 200, {
+          success: true,
+          booking: updated[0],
+          message:
+            statusMessages[nextStatus],
+        });
+      }
       /*
        * CREATE CLIENT GOOGLE DRIVE FOLDER
        *

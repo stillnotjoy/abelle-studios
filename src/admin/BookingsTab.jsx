@@ -1510,6 +1510,15 @@ function BookingsTab({
                     "PAID" ||
                   bookingBalance <= 0;
 
+                const postProductionLabel =
+                  booking.post_production_status ===
+                  "DELIVERED"
+                    ? "Delivered"
+                    : booking.post_production_status ===
+                        "READY_FOR_DELIVERY"
+                      ? "Ready for Delivery"
+                      : "For Editing";
+
                 return (
                   <article
                     className="crm-booking-row"
@@ -1641,7 +1650,7 @@ function BookingsTab({
   {booking.shoot_status === "COMPLETED" ? (
     <span className="crm-booking-paid-label">
       <CheckCircle2 size={14} />
-      For Editing
+      {postProductionLabel}
     </span>
   ) : (
     <button

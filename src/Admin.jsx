@@ -14,6 +14,7 @@ import AdminTopbar from "./admin/components/AdminTopbar";
 import DashboardTab from "./admin/DashboardTab";
 import CalendarTab from "./admin/CalendarTab";
 import BookingsTab from "./admin/BookingsTab";
+import PostProductionTab from "./admin/PostProductionTab";
 import DiscountCodesTab from "./admin/DiscountCodesTab";
 import PackagesTab from "./admin/PackagesTab";
 import BlockedDatesTab from "./admin/BlockedDatesTab";
@@ -36,6 +37,12 @@ const PAGE_DETAILS = {
     title: "Bookings",
     description:
       "Manage online, manual, walk-in, and pay-in-studio bookings.",
+  },
+
+  "Editing Queue": {
+    title: "Editing Queue",
+    description:
+      "Move completed shoots through editing, file preparation, and client delivery.",
   },
 
   "Discount Codes": {
@@ -278,6 +285,11 @@ function Admin() {
                   )
                 }
               />
+            )}
+
+            {activeTab ===
+              "Editing Queue" && (
+              <PostProductionTab />
             )}
 
             {activeTab ===

@@ -18,6 +18,7 @@ export const MANUAL_BOOKING_SLOTS = [
 export const ADMIN_TABS = [
   "Dashboard",
   "Bookings",
+  "Editing Queue",
   "Discount Codes",
   "Packages",
   "Blocked Dates",

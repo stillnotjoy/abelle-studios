@@ -11,6 +11,7 @@ import {
   Package,
   BadgePercent,
   CalendarX2,
+  Image as ImageIcon,
   Settings as SettingsIcon,
   Plug,
 } from "lucide-react";
@@ -47,6 +48,11 @@ const NAVIGATION_GROUPS = [
       {
         label: "Bookings",
         icon: CalendarDays,
+        enabled: true,
+      },
+      {
+        label: "Editing Queue",
+        icon: ImageIcon,
         enabled: true,
       },
       {
