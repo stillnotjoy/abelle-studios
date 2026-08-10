@@ -5,9 +5,11 @@ import {
   Clock3,
   CloudCheck,
   CloudOff,
+  History,
   Plus,
   RefreshCw,
   TriangleAlert,
+  X,
 } from "lucide-react";
 
 import {
@@ -202,6 +204,12 @@ function CalendarTab({
     useState("");
   const [lastSyncCheck, setLastSyncCheck] =
     useState("");
+  const [historyPreview, setHistoryPreview] =
+    useState(null);
+  const [isLoadingHistory, setIsLoadingHistory] =
+    useState(false);
+  const [historyError, setHistoryError] =
+    useState("");
   const adminPin = getSavedAdminPin();
 
   const loadBookings = useCallback(
@@ -312,6 +320,46 @@ function CalendarTab({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCalendarSync();
   }, [loadCalendarSync]);
+
+  const loadHistoryPreview = useCallback(
+    async () => {
+      try {
+        setIsLoadingHistory(true);
+        setHistoryError("");
+
+        const response = await fetch(
+          "/api/admin-booking-import-preview",
+          {
+            headers: {
+              "x-admin-pin": adminPin,
+            },
+          }
+        );
+        const data =
+          await readJsonResponse(response);
+
+        if (!response.ok || !data.ok) {
+          throw new Error(
+            data.error ||
+              "Could not review spreadsheet history."
+          );
+        }
+
+        setHistoryPreview(data);
+      } catch (historyLoadError) {
+        console.error(
+          "Spreadsheet history preview failed:",
+          historyLoadError
+        );
+        setHistoryError(
+          historyLoadError.message
+        );
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    },
+    [adminPin]
+  );
 
   const bookingsByDate = useMemo(() => {
     const grouped = new Map();
@@ -615,6 +663,25 @@ function CalendarTab({
 
           <button
             type="button"
+            className="crm-calendar-secondary-button"
+            onClick={loadHistoryPreview}
+            disabled={isLoadingHistory}
+          >
+            <History
+              size={16}
+              className={
+                isLoadingHistory
+                  ? "is-spinning"
+                  : ""
+              }
+            />
+            {isLoadingHistory
+              ? "Checking..."
+              : "Review history"}
+          </button>
+
+          <button
+            type="button"
             className="crm-calendar-primary-button"
             onClick={onCreateBooking}
           >
@@ -703,6 +770,164 @@ function CalendarTab({
           </button>
         </div>
       </div>
+
+      {(historyPreview ||
+        historyError ||
+        isLoadingHistory) && (
+        <section className="crm-calendar-history-preview">
+          <div className="crm-calendar-history-heading">
+            <div>
+              <span>Spreadsheet reconciliation</span>
+              <h3>Historical booking preview</h3>
+              <p>
+                Preview only — no bookings or Google
+                Calendar events have been changed.
+              </p>
+            </div>
+
+            <div className="crm-calendar-history-actions">
+              <button
+                type="button"
+                onClick={loadHistoryPreview}
+                disabled={isLoadingHistory}
+              >
+                <RefreshCw
+                  size={14}
+                  className={
+                    isLoadingHistory
+                      ? "is-spinning"
+                      : ""
+                  }
+                />
+                Run again
+              </button>
+
+              <button
+                type="button"
+                className="is-close"
+                onClick={() => {
+                  setHistoryPreview(null);
+                  setHistoryError("");
+                }}
+                aria-label="Close history preview"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {historyError && (
+            <div className="crm-calendar-history-error">
+              {historyError}
+            </div>
+          )}
+
+          {isLoadingHistory && !historyPreview ? (
+            <div className="crm-calendar-history-loading">
+              <RefreshCw
+                size={18}
+                className="is-spinning"
+              />
+              Comparing the spreadsheet, CRM, and
+              Google Calendar...
+            </div>
+          ) : (
+            historyPreview && (
+              <>
+                <div className="crm-calendar-history-summary">
+                  <div>
+                    <span>Spreadsheet rows</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.sheetRows || 0}
+                    </strong>
+                  </div>
+                  <div className="is-good">
+                    <span>Already matched</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.matched || 0}
+                    </strong>
+                  </div>
+                  <div className="is-warning">
+                    <span>Missing from CRM</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.missingCrm || 0}
+                    </strong>
+                  </div>
+                  <div className="is-warning">
+                    <span>Missing calendar event</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.missingCalendar || 0}
+                    </strong>
+                  </div>
+                  <div className="is-danger">
+                    <span>Needs review</span>
+                    <strong>
+                      {historyPreview.summary
+                        ?.needsReview || 0}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="crm-calendar-history-table-wrap">
+                  <table className="crm-calendar-history-table">
+                    <thead>
+                      <tr>
+                        <th>Booking</th>
+                        <th>Client</th>
+                        <th>Schedule</th>
+                        <th>Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(historyPreview.rows || []).map(
+                        (row) => (
+                          <tr key={row.rowNumber}>
+                            <td>
+                              <strong>
+                                {row.bookingReference ||
+                                  `Sheet row ${row.rowNumber}`}
+                              </strong>
+                              <span>
+                                {row.packageTitle ||
+                                  "Package not set"}
+                              </span>
+                            </td>
+                            <td>
+                              {row.clientName ||
+                                "Client not set"}
+                            </td>
+                            <td>
+                              <strong>
+                                {row.shootDate ||
+                                  "Date not set"}
+                              </strong>
+                              <span>
+                                {row.shootTime ||
+                                  "Time not set"}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={`crm-calendar-history-result is-${row.code}`}
+                              >
+                                {row.label}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          )}
+        </section>
+      )}
 
       <div className="crm-calendar-layout">
         <section
