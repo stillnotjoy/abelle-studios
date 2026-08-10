@@ -248,18 +248,18 @@
 .crm-booking-row {
   display: grid;
   grid-template-columns:
-    minmax(200px, 1.25fr)
-    minmax(130px, 0.75fr)
-    minmax(165px, 0.95fr)
-    minmax(180px, 1fr)
-    minmax(290px, 1.4fr);
+    minmax(200px, 1.2fr)
+    minmax(100px, 0.5fr)
+    minmax(145px, 0.8fr)
+    minmax(150px, 0.85fr)
+    minmax(350px, 1.55fr);
   align-items: center;
-  column-gap: 24px;
+  column-gap: 18px;
 }
 
 .crm-bookings-table-head {
   min-height: 40px;
-  padding: 0 24px;
+  padding: 0 20px;
   border-top: 1px solid var(--crm-border);
   border-bottom: 1px solid var(--crm-border);
   background: #faf8f5;
@@ -271,8 +271,8 @@
 }
 
 .crm-booking-row {
-  min-height: 112px;
-  padding: 20px 24px;
+  min-height: 100px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--crm-border);
   background: #ffffff;
   transition: background 0.18s ease;
@@ -401,10 +401,24 @@
 
 .crm-booking-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 9px;
+  gap: 6px;
+}
+
+.crm-booking-actions .crm-booking-action,
+.crm-booking-actions .crm-booking-paid-label {
+  min-height: 30px;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 8px;
+}
+
+.crm-booking-actions .crm-booking-action svg,
+.crm-booking-actions .crm-booking-paid-label svg {
+  width: 12px;
+  height: 12px;
 }
 
 .crm-booking-action {
@@ -439,15 +453,18 @@
   background: #2b2723;
 }
 
-.crm-booking-action.is-delete {
-  width: 34px;
+.crm-booking-actions
+  .crm-booking-action.is-delete {
+  width: 28px;
+  min-width: 28px;
   padding: 0;
   border: 0;
   background: transparent;
   color: #ad2929;
 }
 
-.crm-booking-action.is-delete:hover:not(:disabled) {
+.crm-booking-actions
+  .crm-booking-action.is-delete:hover:not(:disabled) {
   background: transparent;
   color: #d11f1f;
 }
@@ -637,7 +654,8 @@
     width: 100%;
   }
 
-  .crm-booking-action.is-delete {
+  .crm-booking-actions
+    .crm-booking-action.is-delete {
     width: 100%;
   }
 }
