@@ -1,6 +1,22 @@
 // api/admin-manual-bookings.js
 
 import { requireAdmin } from "../server/adminAuth.js";
+import { recordPaymentTransaction } from "../server/paymentLedger.js";
+import {
+  buildCustomerDirectory,
+  normalizeCustomerPhone,
+  summarizeCustomers,
+} from "../server/customerDirectory.js";
+
+export const config = {
+  maxDuration: 60,
+};
+
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL;
@@ -93,6 +109,133 @@ function getBookingReference(
     );
 
   return `AB-M-${shootCode}-${cleanDate}-${uniqueNumber}`;
+}
+
+function getNextDate(date) {
+  const parsedDate = new Date(
+    `${cleanText(date)}T00:00:00.000Z`
+  );
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  parsedDate.setUTCDate(
+    parsedDate.getUTCDate() + 1
+  );
+
+  return parsedDate
+    .toISOString()
+    .slice(0, 10);
+}
+
+function getScheduledAt(date, time) {
+  const scheduledAt = new Date(
+    `${cleanText(date)}T${cleanText(
+      time
+    )}:00+08:00`
+  );
+
+  return Number.isNaN(
+    scheduledAt.getTime()
+  )
+    ? null
+    : scheduledAt;
+}
+
+async function findCalendarEventByReference({
+  appsScriptUrl,
+  appsScriptSecret,
+  bookingReference,
+  shootDate,
+}) {
+  const rangeEnd = getNextDate(shootDate);
+
+  if (!rangeEnd) {
+    return null;
+  }
+
+  const snapshotUrl = new URL(
+    appsScriptUrl
+  );
+
+  snapshotUrl.searchParams.set(
+    "secret",
+    appsScriptSecret
+  );
+  snapshotUrl.searchParams.set(
+    "action",
+    "calendar_sync_snapshot"
+  );
+  snapshotUrl.searchParams.set(
+    "start",
+    shootDate
+  );
+  snapshotUrl.searchParams.set(
+    "end",
+    rangeEnd
+  );
+
+  const snapshotResponse = await fetch(
+    snapshotUrl.toString(),
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: APPS_SCRIPT_REQUEST_HEADERS,
+    }
+  );
+
+  const snapshotText =
+    await snapshotResponse.text();
+
+  let snapshotData;
+
+  try {
+    snapshotData = snapshotText
+      ? JSON.parse(snapshotText)
+      : null;
+  } catch {
+    console.error(
+      "Apps Script recovery returned non-JSON:",
+      snapshotText.slice(0, 500)
+    );
+
+    return null;
+  }
+
+  if (
+    !snapshotResponse.ok ||
+    !snapshotData?.ok ||
+    !Array.isArray(snapshotData.events)
+  ) {
+    return null;
+  }
+
+  const expectedReference = cleanText(
+    bookingReference
+  ).toUpperCase();
+
+  const matchingEvent =
+    snapshotData.events.find(
+      (event) =>
+        cleanText(
+          event?.bookingReference
+        ).toUpperCase() ===
+        expectedReference
+    );
+
+  const eventId = cleanText(
+    matchingEvent?.eventId
+  );
+
+  return eventId
+    ? {
+        eventId,
+        bookingReference:
+          expectedReference,
+        recovered: true,
+      }
+    : null;
 }
 
 async function supabaseRequest(
@@ -211,6 +354,9 @@ async function getManualBookingById(
           "payment_status",
           "amount_paid",
           "remaining_balance",
+          "payment_provider",
+          "payment_reference",
+          "payment_option",
           "calendar_event_id",
           "client_drive_folder_id",
           "client_drive_folder_url",
@@ -297,6 +443,14 @@ async function createManualBookingInCalendar(
 
     notes:
       manualBooking.notes || "",
+
+    paymentMethod:
+      manualBooking.payment_provider ||
+      "UNKNOWN",
+
+    paymentReference:
+      manualBooking.payment_reference ||
+      "",
   };
 
   const appsScriptResponse = await fetch(
@@ -305,6 +459,7 @@ async function createManualBookingInCalendar(
       method: "POST",
 
       headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
         "Content-Type":
           "application/json",
       },
@@ -327,11 +482,30 @@ async function createManualBookingInCalendar(
   } catch {
     console.error(
       "Apps Script non-JSON response:",
-      text
+      text.slice(0, 500)
     );
 
+    const recoveredEvent =
+      await findCalendarEventByReference({
+        appsScriptUrl,
+        appsScriptSecret,
+        bookingReference:
+          manualBooking.booking_reference,
+        shootDate:
+          manualBooking.shoot_date,
+      });
+
+    if (recoveredEvent) {
+      console.warn(
+        "Recovered completed Apps Script booking:",
+        manualBooking.booking_reference
+      );
+
+      return recoveredEvent;
+    }
+
     throw new Error(
-      "Could not read Apps Script response."
+      "Google Calendar completed without a readable confirmation. Please refresh before trying again."
     );
   }
 
@@ -377,6 +551,7 @@ async function recordManualBookingPaymentExternally(
       method: "POST",
 
       headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
         "Content-Type":
           "application/json",
       },
@@ -454,6 +629,120 @@ async function recordManualBookingPaymentExternally(
   return data;
 }
 
+async function updateManualBookingExternally(
+  manualBooking
+) {
+  const appsScriptUrl =
+    process.env.GOOGLE_APPS_SCRIPT_URL;
+
+  const appsScriptSecret =
+    process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
+  if (
+    !appsScriptUrl ||
+    !appsScriptSecret
+  ) {
+    throw new Error(
+      "Missing Google Apps Script environment variables."
+    );
+  }
+
+  const response = await fetch(
+    appsScriptUrl,
+    {
+      method: "POST",
+      headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        secret: appsScriptSecret,
+        action:
+          "update_manual_booking",
+        bookingReference:
+          manualBooking.booking_reference,
+        calendarEventId:
+          manualBooking.calendar_event_id ||
+          "",
+        name:
+          manualBooking.client_name,
+        email: manualBooking.email,
+        phone: manualBooking.phone,
+        packageTitle:
+          manualBooking.package_title,
+        packagePrice:
+          manualBooking.package_price,
+        durationMinutes:
+          manualBooking.duration_minutes,
+        date:
+          manualBooking.shoot_date,
+        time:
+          manualBooking.shoot_time,
+        paymentStatus:
+          manualBooking.payment_status,
+        amountPaid:
+          manualBooking.amount_paid,
+        remainingBalance:
+          manualBooking.remaining_balance,
+        paymentMethod:
+          manualBooking.payment_provider ||
+          "UNKNOWN",
+        paymentReference:
+          manualBooking.payment_reference ||
+          "",
+        notes:
+          manualBooking.notes || "",
+      }),
+    }
+  );
+
+  const responseText =
+    await response.text();
+
+  let data = null;
+
+  try {
+    data = responseText
+      ? JSON.parse(responseText)
+      : null;
+  } catch {
+    throw new Error(
+      "Could not read the booking update response from Google Calendar and Sheets."
+    );
+  }
+
+  if (!response.ok || !data?.ok) {
+    throw new Error(
+      data?.error ||
+        "Could not update Google Calendar and Sheets."
+    );
+  }
+
+  return data;
+}
+
+function isUpcomingManualBooking(
+  booking
+) {
+  const scheduledAt = new Date(
+    `${cleanText(
+      booking?.shoot_date
+    )}T${cleanText(
+      booking?.shoot_time
+    )}:00+08:00`
+  );
+
+  return (
+    booking?.shoot_status !==
+      "COMPLETED" &&
+    !Number.isNaN(
+      scheduledAt.getTime()
+    ) &&
+    scheduledAt.getTime() > Date.now()
+  );
+}
+
 async function createClientDriveFolderExternally(
   manualBooking
 ) {
@@ -478,6 +767,7 @@ async function createClientDriveFolderExternally(
       method: "POST",
 
       headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
         "Content-Type":
           "application/json",
       },
@@ -576,6 +866,7 @@ async function deleteManualBookingRecords(
       method: "POST",
 
       headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
         "Content-Type":
           "application/json",
       },
@@ -634,6 +925,135 @@ async function deleteManualBookingRecords(
   return data;
 }
 
+async function getCustomerDirectoryBookings() {
+  return supabaseRequest(
+    [
+      "manual_bookings",
+      "?select=id,booking_reference,client_name,email,phone,package_title,package_price,shoot_date,shoot_time,booking_status,payment_status,amount_paid,remaining_balance,booking_source,post_production_status,created_at",
+      "&order=shoot_date.desc",
+      "&limit=5000",
+    ].join("")
+  );
+}
+
+function normalizeCommunicationMessage(message) {
+  const direction = cleanText(
+    message?.direction
+  ).toLowerCase();
+
+  return {
+    id: cleanText(
+      message?.id || message?.uid
+    ),
+    channel: "sms",
+    direction:
+      direction === "inbound" ||
+      direction === "incoming" ||
+      direction === "received" ||
+      direction === "in"
+        ? "inbound"
+        : "outbound",
+    body: cleanText(
+      message?.body || message?.message
+    ).slice(0, 4000),
+    status: cleanText(
+      message?.status
+    ).slice(0, 80),
+    sentAt: cleanText(
+      message?.sentAt ||
+        message?.createdAt ||
+        message?.date
+    ),
+    from: cleanText(message?.from).slice(
+      0,
+      80
+    ),
+    to: cleanText(message?.to).slice(0, 80),
+  };
+}
+
+async function getPhilSmsHistory(phone) {
+  const appsScriptUrl =
+    process.env.GOOGLE_APPS_SCRIPT_URL;
+  const appsScriptSecret =
+    process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
+  if (!appsScriptUrl || !appsScriptSecret) {
+    throw new Error(
+      "Missing Google Apps Script environment variables."
+    );
+  }
+
+  const historyUrl = new URL(
+    appsScriptUrl
+  );
+
+  historyUrl.searchParams.set(
+    "secret",
+    appsScriptSecret
+  );
+  historyUrl.searchParams.set(
+    "action",
+    "philsms_history"
+  );
+  historyUrl.searchParams.set(
+    "phone",
+    phone
+  );
+
+  const response = await fetch(
+    historyUrl.toString(),
+    {
+      method: "GET",
+      headers: APPS_SCRIPT_REQUEST_HEADERS,
+    }
+  );
+  const responseText =
+    await response.text();
+
+  let data = null;
+
+  try {
+    data = responseText
+      ? JSON.parse(responseText)
+      : null;
+  } catch {
+    console.error(
+      "Apps Script SMS history returned non-JSON:",
+      responseText.slice(0, 500)
+    );
+
+    throw new Error(
+      "Could not read the SMS history response."
+    );
+  }
+
+  if (!response.ok || !data?.ok) {
+    throw new Error(
+      data?.error ||
+        "Could not load PhilSMS history."
+    );
+  }
+
+  const messages = Array.isArray(
+    data.messages
+  )
+    ? data.messages
+        .map(normalizeCommunicationMessage)
+        .filter(
+          (message) =>
+            message.id ||
+            message.body ||
+            message.sentAt
+        )
+    : [];
+
+  return {
+    messages,
+    hasMore: Boolean(data.hasMore),
+  };
+}
+
 export default async function handler(
   req,
   res
@@ -647,6 +1067,87 @@ export default async function handler(
      * Load all manual bookings.
      */
     if (req.method === "GET") {
+      if (
+        cleanText(req.query?.view).toLowerCase() ===
+        "communications"
+      ) {
+        const customerId = cleanText(
+          req.query?.customerId
+        );
+
+        if (!customerId) {
+          return sendJson(res, 400, {
+            error:
+              "Customer profile is required.",
+          });
+        }
+
+        const customerBookings =
+          await getCustomerDirectoryBookings();
+        const customers =
+          buildCustomerDirectory(
+            customerBookings || []
+          );
+        const customer = customers.find(
+          (entry) =>
+            entry.id === customerId
+        );
+
+        if (!customer) {
+          return sendJson(res, 404, {
+            error:
+              "Customer profile could not be found. Refresh Customers and try again.",
+          });
+        }
+
+        const normalizedPhone =
+          normalizeCustomerPhone(
+            customer.phone
+          );
+
+        if (!normalizedPhone) {
+          return sendJson(res, 400, {
+            error:
+              "This customer does not have a mobile number.",
+          });
+        }
+
+        const history =
+          await getPhilSmsHistory(
+            normalizedPhone
+          );
+
+        return sendJson(res, 200, {
+          channel: "sms",
+          customerId: customer.id,
+          customerName: customer.name,
+          phone: customer.phone,
+          messages: history.messages,
+          hasMore: history.hasMore,
+          fetchedAt:
+            new Date().toISOString(),
+        });
+      }
+
+      if (
+        cleanText(req.query?.view).toLowerCase() ===
+        "customers"
+      ) {
+        const customerBookings =
+          await getCustomerDirectoryBookings();
+
+        const customers =
+          buildCustomerDirectory(
+            customerBookings || []
+          );
+
+        return sendJson(res, 200, {
+          summary:
+            summarizeCustomers(customers),
+          customers,
+        });
+      }
+
       const bookings =
         await supabaseRequest(
           [
@@ -667,6 +1168,191 @@ export default async function handler(
      */
     if (req.method === "POST") {
       const body = req.body || {};
+
+      if (
+        cleanText(body.action) ===
+        "update_customer"
+      ) {
+        const customerId = cleanText(
+          body.customerId
+        );
+        const customerName = cleanText(
+          body.name
+        ).slice(0, 120);
+        const customerEmail = cleanText(
+          body.email
+        )
+          .toLowerCase()
+          .slice(0, 254);
+        const customerPhone = cleanText(
+          body.phone
+        ).slice(0, 40);
+        const normalizedPhone =
+          normalizeCustomerPhone(
+            customerPhone
+          );
+
+        if (!customerId || !customerName) {
+          return sendJson(res, 400, {
+            error:
+              "Customer name is required.",
+          });
+        }
+
+        if (!customerEmail && !normalizedPhone) {
+          return sendJson(res, 400, {
+            error:
+              "Keep at least one email address or mobile number for this customer.",
+          });
+        }
+
+        if (
+          customerEmail &&
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+            customerEmail
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Enter a valid customer email address.",
+          });
+        }
+
+        if (
+          normalizedPhone &&
+          (normalizedPhone.length < 10 ||
+            normalizedPhone.length > 15)
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Enter a valid customer mobile number.",
+          });
+        }
+
+        const customerBookings =
+          await supabaseRequest(
+            [
+              "manual_bookings",
+              "?select=id,booking_reference,client_name,email,phone,package_title,package_price,shoot_date,shoot_time,booking_status,payment_status,amount_paid,remaining_balance,booking_source,post_production_status,created_at",
+              "&order=shoot_date.desc",
+              "&limit=5000",
+            ].join("")
+          );
+        const customers =
+          buildCustomerDirectory(
+            customerBookings || []
+          );
+        const customer = customers.find(
+          (entry) => entry.id === customerId
+        );
+
+        if (!customer) {
+          return sendJson(res, 404, {
+            error:
+              "Customer profile could not be found. Refresh Customers and try again.",
+          });
+        }
+
+        const duplicateCustomer =
+          customers.find((entry) => {
+            if (entry.id === customerId) {
+              return false;
+            }
+
+            const samePhone =
+              normalizedPhone &&
+              normalizeCustomerPhone(
+                entry.phone
+              ) === normalizedPhone;
+            const sameEmail =
+              customerEmail &&
+              cleanText(entry.email)
+                .toLowerCase() ===
+                customerEmail;
+
+            return samePhone || sameEmail;
+          });
+
+        if (duplicateCustomer) {
+          return sendJson(res, 409, {
+            error:
+              "That mobile number or email address already belongs to another customer profile.",
+          });
+        }
+
+        const bookingIds =
+          customer.bookings
+            .map((booking) =>
+              cleanText(booking.id)
+            )
+            .filter(Boolean);
+
+        if (!bookingIds.length) {
+          return sendJson(res, 404, {
+            error:
+              "No booking records are connected to this customer.",
+          });
+        }
+
+        const updatedBookings =
+          await supabaseRequest(
+            `manual_bookings?id=in.(${bookingIds.join(",")})`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                client_name: customerName,
+                email: customerEmail,
+                phone: customerPhone,
+              }),
+            }
+          );
+
+        if (!updatedBookings?.length) {
+          return sendJson(res, 500, {
+            error:
+              "Customer information could not be updated.",
+          });
+        }
+
+        const updatedBookingIds =
+          new Set(bookingIds);
+        const nextBookings =
+          (customerBookings || []).map(
+            (booking) =>
+              updatedBookingIds.has(
+                cleanText(booking.id)
+              )
+                ? {
+                    ...booking,
+                    client_name:
+                      customerName,
+                    email: customerEmail,
+                    phone: customerPhone,
+                  }
+                : booking
+          );
+        const nextCustomers =
+          buildCustomerDirectory(nextBookings);
+        const updatedCustomer =
+          nextCustomers.find((entry) =>
+            entry.bookings.some(
+              (booking) =>
+                updatedBookingIds.has(
+                  cleanText(booking.id)
+                )
+            )
+          );
+
+        return sendJson(res, 200, {
+          success: true,
+          customer: updatedCustomer,
+          updatedBookingCount:
+            updatedBookings.length,
+          message:
+            "Customer information updated.",
+        });
+      }
+
       /*
        * MARK SHOOT COMPLETE
        *
@@ -1178,6 +1864,15 @@ export default async function handler(
       const clientName =
         cleanText(body.clientName);
 
+      const isHistoricalBooking =
+        body.isHistoricalBooking === true;
+
+      const historicalWorkflowStatus =
+        cleanText(
+          body.historicalWorkflowStatus ||
+            "DELIVERED"
+        ).toUpperCase();
+
       const email =
         cleanText(body.email);
 
@@ -1196,10 +1891,29 @@ export default async function handler(
       const notes =
         cleanText(body.notes);
 
+      const requestedAdditionalItems =
+        Array.isArray(
+          body.additionalItems
+        )
+          ? body.additionalItems
+          : [];
+
       const paymentStatus =
         cleanText(
           body.paymentStatus || "UNPAID"
         ).toUpperCase();
+
+      const initialPaymentMethod =
+        cleanText(
+          body.paymentMethod || "CASH"
+        ).toUpperCase();
+
+      const initialPaymentReference =
+        cleanText(body.paymentReference);
+
+      const initialPaymentDate =
+        cleanText(body.paymentDate) ||
+        new Date().toISOString();
 
       if (
         !clientName ||
@@ -1252,6 +1966,63 @@ export default async function handler(
         });
       }
 
+      if (isHistoricalBooking) {
+        const scheduledAt =
+          getScheduledAt(
+            shootDate,
+            shootTime
+          );
+
+        if (
+          !scheduledAt ||
+          scheduledAt.getTime() >=
+            Date.now()
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Historical booking mode can only be used for a shoot time that has already passed.",
+          });
+        }
+
+        if (
+          ![
+            "FOR_EDITING",
+            "DELIVERED",
+          ].includes(
+            historicalWorkflowStatus
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Choose a valid historical workflow status.",
+          });
+        }
+      }
+
+      if (
+        paymentStatus !== "UNPAID" &&
+        !ALLOWED_PAYMENT_METHODS.includes(
+          initialPaymentMethod
+        )
+      ) {
+        return sendJson(res, 400, {
+          error:
+            "Please select a valid payment method.",
+        });
+      }
+
+      if (
+        paymentStatus !== "UNPAID" &&
+        Number.isNaN(
+          new Date(initialPaymentDate).getTime()
+        )
+      ) {
+        return sendJson(res, 400, {
+          error:
+            "Please select a valid payment date.",
+        });
+      }
+
       const selectedPackage =
         await getPackageById(
           packageId
@@ -1271,15 +2042,151 @@ export default async function handler(
         });
       }
 
-      const packagePrice =
-        Number(
+      if (
+        requestedAdditionalItems.length >
+        10
+      ) {
+        return sendJson(res, 400, {
+          error:
+            "A booking can have up to 10 additional items.",
+        });
+      }
+
+      const additionalItems = [];
+
+      for (const requestedItem of
+        requestedAdditionalItems) {
+        const itemType = cleanText(
+          requestedItem?.type
+        ).toUpperCase();
+
+        if (itemType === "PACKAGE") {
+          const additionalPackageId =
+            cleanText(
+              requestedItem?.packageId
+            );
+
+          if (!additionalPackageId) {
+            return sendJson(res, 400, {
+              error:
+                "Please choose every additional package.",
+            });
+          }
+
+          const additionalPackage =
+            await getPackageById(
+              additionalPackageId
+            );
+
+          if (
+            !additionalPackage ||
+            !additionalPackage.is_active
+          ) {
+            return sendJson(res, 409, {
+              error:
+                "One of the additional packages is unavailable.",
+            });
+          }
+
+          const additionalPackagePrice =
+            roundCurrency(
+              requestedItem?.price
+            );
+
+          if (
+            !Number.isFinite(
+              additionalPackagePrice
+            ) ||
+            additionalPackagePrice < 0 ||
+            additionalPackagePrice > 1000000
+          ) {
+            return sendJson(res, 500, {
+              error:
+                "Enter a valid cost for every additional package.",
+            });
+          }
+
+          additionalItems.push({
+            type: "PACKAGE",
+            name: additionalPackage.name,
+            price:
+              additionalPackagePrice,
+            durationMinutes: Number(
+              additionalPackage.duration_minutes ||
+                40
+            ),
+          });
+
+          continue;
+        }
+
+        if (itemType === "CUSTOM") {
+          const itemName = cleanText(
+            requestedItem?.name
+          ).slice(0, 100);
+
+          const itemPrice =
+            roundCurrency(
+              requestedItem?.price
+            );
+
+          if (
+            !itemName ||
+            !Number.isFinite(itemPrice) ||
+            itemPrice <= 0 ||
+            itemPrice > 1000000
+          ) {
+            return sendJson(res, 400, {
+              error:
+                "Enter a valid name and cost for every additional service.",
+            });
+          }
+
+          additionalItems.push({
+            type: "CUSTOM",
+            name: itemName,
+            price: itemPrice,
+            durationMinutes: 0,
+          });
+
+          continue;
+        }
+
+        return sendJson(res, 400, {
+          error:
+            "An additional booking item is invalid.",
+        });
+      }
+
+      const basePackagePrice =
+        roundCurrency(
           selectedPackage.default_price
         );
 
+      const additionalItemsTotal =
+        roundCurrency(
+          additionalItems.reduce(
+            (total, item) =>
+              total + item.price,
+            0
+          )
+        );
+
+      const packagePrice =
+        roundCurrency(
+          basePackagePrice +
+            additionalItemsTotal
+        );
+
       const durationMinutes =
-        Number(
-          selectedPackage.duration_minutes ||
-            40
+        additionalItems.reduce(
+          (total, item) =>
+            total +
+            item.durationMinutes,
+          Number(
+            selectedPackage.duration_minutes ||
+              40
+          )
         );
 
       if (
@@ -1348,11 +2255,39 @@ export default async function handler(
       }
 
       const remainingBalance =
-        Math.max(
-          packagePrice -
-            amountPaid,
-          0
+        roundCurrency(
+          Math.max(
+            packagePrice -
+              amountPaid,
+            0
+          )
         );
+
+      const combinedPackageTitle = [
+        selectedPackage.name,
+        ...additionalItems.map(
+          (item) => item.name
+        ),
+      ].join(" + ");
+
+      const additionalItemsNote =
+        additionalItems.length > 0
+          ? `Additional items: ${additionalItems
+              .map(
+                (item) =>
+                  `${item.name} — ₱${item.price.toLocaleString(
+                    "en-PH"
+                  )}`
+              )
+              .join("; ")}`
+          : "";
+
+      const bookingNotes = [
+        additionalItemsNote,
+        notes,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
      const bookingReference =
   getBookingReference(
@@ -1383,7 +2318,7 @@ export default async function handler(
           durationMinutes,
 
         package_title:
-          selectedPackage.name,
+          combinedPackageTitle,
 
         package_price:
           packagePrice,
@@ -1403,22 +2338,62 @@ export default async function handler(
         remaining_balance:
           remainingBalance,
 
-         booking_status:
+        payment_provider:
+          amountPaid > 0
+            ? initialPaymentMethod
+            : null,
+
+        payment_reference:
+          amountPaid > 0
+            ? initialPaymentReference || null
+            : null,
+
+        payment_option:
+          amountPaid > 0
+            ? "MANUAL_ADMIN"
+            : "PAY_IN_STUDIO",
+
+        booking_status:
           "CONFIRMED",
 
         shoot_status:
-          "SCHEDULED",
+          isHistoricalBooking
+            ? "COMPLETED"
+            : "SCHEDULED",
+
+        shoot_completed_at:
+          isHistoricalBooking
+            ? getScheduledAt(
+                shootDate,
+                shootTime
+              ).toISOString()
+            : null,
 
         post_production_status:
-          "NOT_STARTED",
+          isHistoricalBooking
+            ? historicalWorkflowStatus
+            : "NOT_STARTED",
 
-        notes,
+        delivered_at:
+          isHistoricalBooking &&
+          historicalWorkflowStatus ===
+            "DELIVERED"
+            ? new Date().toISOString()
+            : null,
+
+        notes: bookingNotes,
       };
 
       const calendarResult =
-        await createManualBookingInCalendar(
-          manualBookingPayload
-        );
+        isHistoricalBooking
+          ? {
+              eventId: "",
+              notificationsSkipped:
+                true,
+            }
+          : await createManualBookingInCalendar(
+              manualBookingPayload
+            );
 
       const {
         package_id,
@@ -1431,10 +2406,12 @@ export default async function handler(
 
         calendar_event_id:
           calendarResult.eventId ||
-          "",
+          null,
 
         calendar_status:
-          "CREATED",
+          isHistoricalBooking
+            ? "NOT_REQUIRED"
+            : "CREATED",
       };
 
       const created =
@@ -1450,17 +2427,46 @@ export default async function handler(
           }
         );
 
+      const createdBooking =
+        created?.[0] || null;
+
+      if (createdBooking && amountPaid > 0) {
+        await recordPaymentTransaction({
+          booking: createdBooking,
+          amount: amountPaid,
+          paymentDate: initialPaymentDate,
+          paymentMethod:
+            initialPaymentMethod,
+          paymentProvider:
+            initialPaymentMethod,
+          paymentReference:
+            initialPaymentReference,
+          source: "INITIAL_MANUAL_PAYMENT",
+          notes:
+            isHistoricalBooking
+              ? "Payment recorded with a historical booking."
+              : "Initial payment recorded when the manual booking was created.",
+          idempotencyKey:
+            `initial-manual:${createdBooking.id}`,
+        });
+      }
+
       return sendJson(
         res,
         201,
         {
           booking:
-            created?.[0] ||
-            null,
+            createdBooking,
 
           calendarEventId:
             calendarResult.eventId ||
             "",
+
+          historical:
+            isHistoricalBooking,
+
+          notificationsSent:
+            !isHistoricalBooking,
         }
       );
     }
@@ -1474,6 +2480,423 @@ export default async function handler(
     ) {
       const body =
         req.body || {};
+
+      if (
+        cleanText(body.action) ===
+        "update_booking"
+      ) {
+        const bookingId =
+          cleanText(body.id);
+
+        if (!bookingId) {
+          return sendJson(res, 400, {
+            error:
+              "Manual booking ID is required.",
+          });
+        }
+
+        const manualBooking =
+          await getManualBookingById(
+            bookingId
+          );
+
+        if (!manualBooking) {
+          return sendJson(res, 404, {
+            error:
+              "Manual booking not found.",
+          });
+        }
+
+        if (
+          !isUpcomingManualBooking(
+            manualBooking
+          )
+        ) {
+          return sendJson(res, 409, {
+            error:
+              "Only bookings whose shoot time is still in the future can be edited.",
+          });
+        }
+
+        const clientName =
+          cleanText(body.clientName);
+
+        const email =
+          cleanText(body.email);
+
+        const phone =
+          cleanText(body.phone);
+
+        const packageId =
+          cleanText(body.packageId);
+
+        const shootDate =
+          cleanText(body.shootDate);
+
+        const shootTime =
+          cleanText(body.shootTime);
+
+        const notes =
+          cleanText(body.notes);
+
+        const requestedAdditionalItems =
+          Array.isArray(
+            body.additionalItems
+          )
+            ? body.additionalItems
+            : [];
+
+        if (
+          !clientName ||
+          !packageId ||
+          !shootDate ||
+          !shootTime
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Client name, package, date, and time are required.",
+          });
+        }
+
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(
+            shootDate
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "The selected shoot date is invalid.",
+          });
+        }
+
+        if (
+          !ALLOWED_BOOKING_TIMES.includes(
+            shootTime
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "Please select a valid studio time between 9:00 AM and 5:00 PM.",
+          });
+        }
+
+        const updatedSchedule = {
+          shoot_date: shootDate,
+          shoot_time: shootTime,
+          shoot_status:
+            manualBooking.shoot_status,
+        };
+
+        if (
+          !isUpcomingManualBooking(
+            updatedSchedule
+          )
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "The updated shoot date and time must still be in the future.",
+          });
+        }
+
+        if (
+          requestedAdditionalItems.length >
+          10
+        ) {
+          return sendJson(res, 400, {
+            error:
+              "A booking can have up to 10 additional items.",
+          });
+        }
+
+        const selectedPackage =
+          await getPackageById(
+            packageId
+          );
+
+        if (!selectedPackage) {
+          return sendJson(res, 404, {
+            error:
+              "The selected package could not be found.",
+          });
+        }
+
+        const additionalItems = [];
+
+        for (const requestedItem of
+          requestedAdditionalItems) {
+          const itemType = cleanText(
+            requestedItem?.type
+          ).toUpperCase();
+
+          if (itemType === "PACKAGE") {
+            const additionalPackageId =
+              cleanText(
+                requestedItem?.packageId
+              );
+
+            const additionalPackage =
+              additionalPackageId
+                ? await getPackageById(
+                    additionalPackageId
+                  )
+                : null;
+
+            const itemPrice =
+              roundCurrency(
+                requestedItem?.price
+              );
+
+            if (
+              !additionalPackage ||
+              !Number.isFinite(
+                itemPrice
+              ) ||
+              itemPrice < 0 ||
+              itemPrice > 1000000
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    "Choose a valid package and cost for every additional shoot.",
+                }
+              );
+            }
+
+            additionalItems.push({
+              name:
+                additionalPackage.name,
+              price: itemPrice,
+              durationMinutes: Number(
+                additionalPackage.duration_minutes ||
+                  40
+              ),
+            });
+
+            continue;
+          }
+
+          if (itemType === "CUSTOM") {
+            const itemName = cleanText(
+              requestedItem?.name
+            ).slice(0, 100);
+
+            const itemPrice =
+              roundCurrency(
+                requestedItem?.price
+              );
+
+            if (
+              !itemName ||
+              !Number.isFinite(
+                itemPrice
+              ) ||
+              itemPrice <= 0 ||
+              itemPrice > 1000000
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    "Enter a valid name and cost for every additional service.",
+                }
+              );
+            }
+
+            additionalItems.push({
+              name: itemName,
+              price: itemPrice,
+              durationMinutes: 0,
+            });
+
+            continue;
+          }
+
+          return sendJson(res, 400, {
+            error:
+              "An additional booking item is invalid.",
+          });
+        }
+
+        const basePackagePrice =
+          roundCurrency(
+            selectedPackage.default_price
+          );
+
+        const packagePrice =
+          roundCurrency(
+            basePackagePrice +
+              additionalItems.reduce(
+                (total, item) =>
+                  total + item.price,
+                0
+              )
+          );
+
+        const durationMinutes =
+          additionalItems.reduce(
+            (total, item) =>
+              total +
+              item.durationMinutes,
+            Number(
+              selectedPackage.duration_minutes ||
+                40
+            )
+          );
+
+        const amountPaid =
+          roundCurrency(
+            manualBooking.amount_paid
+          );
+
+        if (packagePrice < amountPaid) {
+          return sendJson(res, 400, {
+            error:
+              `The booking total cannot be lower than the ₱${amountPaid.toLocaleString(
+                "en-PH"
+              )} already paid. Record a refund separately first.`,
+          });
+        }
+
+        const remainingBalance =
+          roundCurrency(
+            packagePrice - amountPaid
+          );
+
+        const paymentStatus =
+          amountPaid <= 0
+            ? "UNPAID"
+            : remainingBalance <= 0
+              ? "PAID"
+              : "PARTIAL";
+
+        const combinedPackageTitle = [
+          selectedPackage.name,
+          ...additionalItems.map(
+            (item) => item.name
+          ),
+        ].join(" + ");
+
+        const additionalItemsNote =
+          additionalItems.length > 0
+            ? `Additional items: ${additionalItems
+                .map(
+                  (item) =>
+                    `${item.name} — ₱${item.price.toLocaleString(
+                      "en-PH"
+                    )}`
+                )
+                .join("; ")}`
+            : "";
+
+        const bookingNotes = [
+          additionalItemsNote,
+          notes,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
+        const updatePayload = {
+          client_name: clientName,
+          email,
+          phone,
+          package_title:
+            combinedPackageTitle,
+          package_price: packagePrice,
+          shoot_date: shootDate,
+          shoot_time: shootTime,
+          payment_status:
+            paymentStatus,
+          remaining_balance:
+            remainingBalance,
+          notes: bookingNotes,
+        };
+
+        const encodedBookingId =
+          encodeURIComponent(
+            bookingId
+          );
+
+        const updated =
+          await supabaseRequest(
+            `manual_bookings?id=eq.${encodedBookingId}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify(
+                updatePayload
+              ),
+            }
+          );
+
+        if (!updated?.length) {
+          return sendJson(res, 404, {
+            error:
+              "The booking could not be updated.",
+          });
+        }
+
+        try {
+          await updateManualBookingExternally(
+            {
+              ...manualBooking,
+              ...updatePayload,
+              duration_minutes:
+                durationMinutes,
+            }
+          );
+        } catch (externalError) {
+          try {
+            await supabaseRequest(
+              `manual_bookings?id=eq.${encodedBookingId}`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  client_name:
+                    manualBooking.client_name,
+                  email:
+                    manualBooking.email,
+                  phone:
+                    manualBooking.phone,
+                  package_title:
+                    manualBooking.package_title,
+                  package_price:
+                    manualBooking.package_price,
+                  shoot_date:
+                    manualBooking.shoot_date,
+                  shoot_time:
+                    manualBooking.shoot_time,
+                  payment_status:
+                    manualBooking.payment_status,
+                  remaining_balance:
+                    manualBooking.remaining_balance,
+                  notes:
+                    manualBooking.notes,
+                }),
+              }
+            );
+          } catch (rollbackError) {
+            console.error(
+              "Booking edit rollback failed:",
+              rollbackError
+            );
+          }
+
+          throw new Error(
+            externalError.message ||
+              "The booking was not updated because Google Calendar and Sheets could not be synchronized.",
+            { cause: externalError }
+          );
+        }
+
+        return sendJson(res, 200, {
+          success: true,
+          booking: updated[0],
+          message:
+            "Booking updated in the CRM, Google Calendar, and spreadsheet.",
+        });
+      }
 
       const bookingId =
         cleanText(
@@ -1656,6 +3079,12 @@ export default async function handler(
 
                 remaining_balance:
                   newRemainingBalance,
+
+                payment_provider:
+                  paymentMethod,
+
+                payment_reference:
+                  paymentReference || null,
               }),
           }
         );
@@ -1681,79 +3110,106 @@ export default async function handler(
        */
       let externalResult;
 
-      try {
-        externalResult =
-          await recordManualBookingPaymentExternally(
-            {
-              bookingReference:
-                manualBooking.booking_reference,
-
-              paymentStatus:
-                newPaymentStatus,
-
-              amountPaid:
-                newAmountPaid,
-
-              remainingBalance:
-                newRemainingBalance,
-
-              amountReceived,
-
-              paymentMethod,
-
-              paymentReference,
-
-              paymentDate,
-
-              paymentNotes,
-            }
-          );
-      } catch (
-        externalError
+      if (
+        cleanText(
+          manualBooking.calendar_status
+        ).toUpperCase() !==
+        "NOT_REQUIRED"
       ) {
-        console.error(
-          "Payment Sheet sync failed. Rolling back Supabase:",
-          externalError
-        );
-
         try {
-          await supabaseRequest(
-            `manual_bookings?id=eq.${encodedBookingId}`,
-            {
-              method:
-                "PATCH",
+          externalResult =
+            await recordManualBookingPaymentExternally(
+              {
+                bookingReference:
+                  manualBooking.booking_reference,
 
-              body:
-                JSON.stringify({
-                  payment_status:
-                    manualBooking.payment_status,
+                paymentStatus:
+                  newPaymentStatus,
 
-                  amount_paid:
-                    previousAmountPaid,
+                amountPaid:
+                  newAmountPaid,
 
-                  remaining_balance:
-                    previousBalance,
-                }),
-            }
-          );
+                remainingBalance:
+                  newRemainingBalance,
+
+                amountReceived,
+
+                paymentMethod,
+
+                paymentReference,
+
+                paymentDate,
+
+                paymentNotes,
+              }
+            );
         } catch (
-          rollbackError
+          externalError
         ) {
           console.error(
-            "Payment rollback failed:",
-            rollbackError
+            "Payment Sheet sync failed. Rolling back Supabase:",
+            externalError
           );
+
+          try {
+            await supabaseRequest(
+              `manual_bookings?id=eq.${encodedBookingId}`,
+              {
+                method:
+                  "PATCH",
+
+                body:
+                  JSON.stringify({
+                    payment_status:
+                      manualBooking.payment_status,
+
+                    amount_paid:
+                      previousAmountPaid,
+
+                    remaining_balance:
+                      previousBalance,
+
+                    payment_provider:
+                      manualBooking.payment_provider,
+
+                    payment_reference:
+                      manualBooking.payment_reference,
+                  }),
+              }
+            );
+          } catch (
+            rollbackError
+          ) {
+            console.error(
+              "Payment rollback failed:",
+              rollbackError
+            );
+
+            throw new Error(
+              "The Google Sheet payment update failed, and the Supabase rollback also failed. Please check this booking manually."
+            );
+          }
 
           throw new Error(
-            "The Google Sheet payment update failed, and the Supabase rollback also failed. Please check this booking manually."
+            externalError.message ||
+              "The payment was not recorded because the Google Sheet could not be updated."
           );
         }
-
-        throw new Error(
-          externalError.message ||
-            "The payment was not recorded because the Google Sheet could not be updated."
-        );
       }
+
+      await recordPaymentTransaction({
+        booking: {
+          ...manualBooking,
+          ...updated[0],
+        },
+        amount: amountReceived,
+        paymentDate,
+        paymentMethod,
+        paymentProvider: paymentMethod,
+        paymentReference,
+        source: "MANUAL_PAYMENT",
+        notes: paymentNotes,
+      });
 
       return sendJson(
         res,
@@ -1834,9 +3290,17 @@ export default async function handler(
        * event and Google Sheet row.
        */
       const externalDeleteResult =
-        await deleteManualBookingRecords(
-          manualBooking
-        );
+        cleanText(
+          manualBooking.calendar_status
+        ).toUpperCase() ===
+        "NOT_REQUIRED"
+          ? {
+              calendarDeleted: false,
+              sheetRowsDeleted: 0,
+            }
+          : await deleteManualBookingRecords(
+              manualBooking
+            );
 
       /*
        * Then remove the Supabase record.

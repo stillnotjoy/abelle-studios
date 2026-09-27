@@ -1,3 +1,5 @@
+/* global process */
+
 import { requireAdmin } from "../server/adminAuth.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -31,7 +33,7 @@ async function supabaseRequest(path, options = {}) {
 
   const text = await response.text();
 
-  let data = null;
+  let data;
 
   try {
     data = text ? JSON.parse(text) : null;
@@ -143,11 +145,35 @@ function buildPackagePayload(body) {
 
 export default async function handler(req, res) {
   try {
-    if (!(await requireAdmin(req, res))) return;
+    const isPublicPackageList =
+      req.method === "GET" &&
+      String(req.query?.public || "") === "1";
+
+    if (!isPublicPackageList) {
+      if (!(await requireAdmin(req, res))) return;
+    }
 
     if (req.method === "GET") {
       const packages = await supabaseRequest(
-        "abelle_packages?select=*&order=display_order.asc,name.asc"
+        isPublicPackageList
+          ? [
+              "abelle_packages?select=",
+              [
+                "id",
+                "name",
+                "description",
+                "default_price",
+                "default_deposit",
+                "duration_minutes",
+                "inclusions",
+                "image_url",
+                "color",
+                "display_order",
+              ].join(","),
+              "&is_active=eq.true",
+              "&order=display_order.asc,name.asc",
+            ].join("")
+          : "abelle_packages?select=*&order=display_order.asc,name.asc"
       );
 
       return sendJson(res, 200, {

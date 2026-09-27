@@ -5,6 +5,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
+
 function sendJson(response, status, data) {
   return response.status(status).json(data);
 }
@@ -324,6 +330,7 @@ export default async function handler(request, response) {
           {
             method: "POST",
             headers: {
+              ...APPS_SCRIPT_REQUEST_HEADERS,
               "Content-Type": "application/json",
             },
             body: JSON.stringify(bookingPayload),

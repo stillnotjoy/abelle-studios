@@ -299,7 +299,9 @@ useEffect(() => {
       setPackagesLoading(true);
       setPackagesError("");
 
-      const response = await fetch("/api/packages");
+      const response = await fetch(
+        "/api/admin-packages?public=1"
+      );
       const responseText = await response.text();
 
       let data = {};

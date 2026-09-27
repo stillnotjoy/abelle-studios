@@ -11,6 +11,7 @@ import {
   CreditCard,
   ExternalLink,
   FolderPlus,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -34,6 +35,8 @@ const MANUAL_BOOKING_SLOTS = [
 ];
 
 const EMPTY_FORM = {
+  isHistoricalBooking: false,
+  historicalWorkflowStatus: "DELIVERED",
   clientName: "",
   email: "",
   phone: "",
@@ -42,6 +45,10 @@ const EMPTY_FORM = {
   shootTime: "",
   paymentStatus: "UNPAID",
   amountPaid: "",
+  paymentMethod: "CASH",
+  paymentReference: "",
+  paymentDate: "",
+  additionalItems: [],
   notes: "",
 };
 
@@ -70,6 +77,101 @@ function getTodayInputValue() {
   return localDate
     .toISOString()
     .slice(0, 10);
+}
+
+function isUpcomingBooking(booking) {
+  const shootDate = String(
+    booking?.shoot_date || ""
+  );
+
+  const shootTime = String(
+    booking?.shoot_time || ""
+  );
+
+  const scheduledAt = new Date(
+    `${shootDate}T${shootTime}:00+08:00`
+  );
+
+  return (
+    booking?.shoot_status !==
+      "COMPLETED" &&
+    !Number.isNaN(
+      scheduledAt.getTime()
+    ) &&
+    scheduledAt.getTime() > Date.now()
+  );
+}
+
+function readBookingExtras(
+  booking,
+  studioPackages
+) {
+  const notes = String(
+    booking?.notes || ""
+  );
+
+  const extrasMatch = notes.match(
+    /^Additional items:\s*(.*?)(?:\n\n|$)/s
+  );
+
+  const cleanedNotes = extrasMatch
+    ? notes
+        .replace(extrasMatch[0], "")
+        .trim()
+    : notes;
+
+  const additionalItems = extrasMatch
+    ? extrasMatch[1]
+        .split(";")
+        .map((entry) =>
+          entry.trim()
+        )
+        .filter(Boolean)
+        .map((entry, index) => {
+          const itemMatch = entry.match(
+            /^(.*?)\s+[—-]\s+₱?([\d,.]+)$/
+          );
+
+          const name = String(
+            itemMatch?.[1] || entry
+          ).trim();
+
+          const price = Number(
+            String(
+              itemMatch?.[2] || "0"
+            ).replaceAll(",", "")
+          );
+
+          const matchingPackage =
+            studioPackages.find(
+              (studioPackage) =>
+                studioPackage.name ===
+                name
+            );
+
+          return {
+            id: `existing-${index}-${name}`,
+            type: matchingPackage
+              ? "PACKAGE"
+              : "CUSTOM",
+            packageId:
+              matchingPackage?.id || "",
+            name: matchingPackage
+              ? ""
+              : name,
+            price: String(
+              Number.isFinite(price)
+                ? price
+                : 0
+            ),
+          };
+        })
+    : [];
+
+  return {
+    additionalItems,
+    notes: cleanedNotes,
+  };
 }
 
 function formatBookingDate(value) {
@@ -233,6 +335,11 @@ function BookingsTab({
   const [showForm, setShowForm] =
     useState(false);
 
+  const [
+    editingBooking,
+    setEditingBooking,
+  ] = useState(null);
+
     const [
     deletingBookingId,
     setDeletingBookingId,
@@ -269,6 +376,11 @@ function BookingsTab({
       ),
     [packages]
   );
+
+  const formPackages =
+    editingBooking
+      ? packages
+      : activePackages;
 
   const bookingStats = useMemo(
     () => ({
@@ -344,22 +456,54 @@ function BookingsTab({
     ]);
 
   const selectedPackage =
-    activePackages.find(
+    formPackages.find(
       (studioPackage) =>
         String(studioPackage.id) ===
         String(form.packageId)
     ) || null;
 
-  const packagePrice = Number(
+  const basePackagePrice = Number(
     selectedPackage?.default_price ||
       0
   );
+
+  const additionalItemsTotal =
+    form.additionalItems.reduce(
+      (total, item) =>
+        total +
+        Number(item.price || 0),
+      0
+    );
+
+  const packagePrice =
+    basePackagePrice +
+    additionalItemsTotal;
+
+  const hasInvalidAdditionalItems =
+    form.additionalItems.some(
+      (item) =>
+        item.type === "PACKAGE"
+          ? !item.packageId ||
+            !Number.isFinite(
+              Number(item.price)
+            ) ||
+            Number(item.price) < 0
+          : !item.name.trim() ||
+            !Number.isFinite(
+              Number(item.price)
+            ) ||
+            Number(item.price) <= 0
+    );
 
   const enteredAmountPaid =
     Number(form.amountPaid || 0);
 
   const effectiveAmountPaid =
-    form.paymentStatus === "PAID"
+    editingBooking
+      ? Number(
+          editingBooking.amount_paid || 0
+        )
+      : form.paymentStatus === "PAID"
       ? packagePrice
       : form.paymentStatus ===
           "UNPAID"
@@ -372,6 +516,15 @@ function BookingsTab({
         effectiveAmountPaid,
       0
     );
+
+  const displayedPaymentStatus =
+    editingBooking
+      ? effectiveAmountPaid <= 0
+        ? "UNPAID"
+        : remainingBalance <= 0
+          ? "PAID"
+          : "PARTIAL"
+      : form.paymentStatus;
 
   const selectedPaymentBalance =
     Number(
@@ -528,7 +681,8 @@ function BookingsTab({
   useEffect(() => {
     if (
       !showForm ||
-      !form.shootDate
+      !form.shootDate ||
+      form.isHistoricalBooking
     ) {
       setBookedTimes([]);
       setSlotError("");
@@ -595,6 +749,7 @@ function BookingsTab({
       isCancelled = true;
     };
   }, [
+    form.isHistoricalBooking,
     form.shootDate,
     showForm,
   ]);
@@ -612,11 +767,15 @@ function BookingsTab({
       null
     );
 
+    setEditingBooking(null);
+
     setForm({
       ...EMPTY_FORM,
       packageId:
         activePackages[0]?.id ||
         "",
+      paymentDate:
+        getTodayInputValue(),
     });
 
     setShowForm(true);
@@ -629,10 +788,30 @@ function BookingsTab({
   ]);
 
   const updateForm = (event) => {
-    const { name, value } =
+    const {
+      name,
+      value,
+      type,
+      checked,
+    } =
       event.target;
 
     setForm((current) => {
+      if (
+        name ===
+        "isHistoricalBooking"
+      ) {
+        return {
+          ...current,
+          isHistoricalBooking:
+            type === "checkbox"
+              ? checked
+              : false,
+          shootDate: "",
+          shootTime: "",
+        };
+      }
+
       if (name === "shootDate") {
         return {
           ...current,
@@ -658,7 +837,7 @@ function BookingsTab({
 
       if (name === "packageId") {
         const nextPackage =
-          activePackages.find(
+          formPackages.find(
             (studioPackage) =>
               String(
                 studioPackage.id
@@ -703,6 +882,90 @@ function BookingsTab({
     }));
   };
 
+  const addAdditionalItem = (
+    type
+  ) => {
+    setForm((current) => ({
+      ...current,
+      additionalItems: [
+        ...current.additionalItems,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type,
+          packageId: "",
+          name: "",
+          price: "",
+        },
+      ],
+    }));
+  };
+
+  const updateAdditionalItem = (
+    itemId,
+    field,
+    value
+  ) => {
+    setForm((current) => ({
+      ...current,
+      additionalItems:
+        current.additionalItems.map(
+          (item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  [field]: value,
+                }
+              : item
+        ),
+    }));
+  };
+
+  const selectAdditionalPackage = (
+    itemId,
+    packageId
+  ) => {
+    const additionalPackage =
+      formPackages.find(
+        (studioPackage) =>
+          String(studioPackage.id) ===
+          String(packageId)
+      );
+
+    setForm((current) => ({
+      ...current,
+      additionalItems:
+        current.additionalItems.map(
+          (item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  packageId,
+                  price: packageId
+                    ? String(
+                        additionalPackage
+                          ?.default_price ||
+                          0
+                      )
+                    : "",
+                }
+              : item
+        ),
+    }));
+  };
+
+  const removeAdditionalItem = (
+    itemId
+  ) => {
+    setForm((current) => ({
+      ...current,
+      additionalItems:
+        current.additionalItems.filter(
+          (item) =>
+            item.id !== itemId
+        ),
+    }));
+  };
+
   const openManualBookingForm =
     () => {
       if (
@@ -718,11 +981,15 @@ function BookingsTab({
         null
       );
 
+      setEditingBooking(null);
+
       setForm({
         ...EMPTY_FORM,
         packageId:
           activePackages[0]?.id ||
           "",
+        paymentDate:
+          getTodayInputValue(),
       });
 
       setShowForm(true);
@@ -732,13 +999,95 @@ function BookingsTab({
     () => {
       setShowForm(false);
 
+      setEditingBooking(null);
+
       setForm({
         ...EMPTY_FORM,
         packageId:
           activePackages[0]?.id ||
           "",
+        paymentDate:
+          getTodayInputValue(),
       });
     };
+
+  const openEditBooking = (
+    booking
+  ) => {
+    if (!isUpcomingBooking(booking)) {
+      alert(
+        "Only bookings whose shoot time is still in the future can be edited."
+      );
+      return;
+    }
+
+    const packageTitle = String(
+      booking.package_title || ""
+    );
+
+    const basePackage = [...packages]
+      .sort(
+        (first, second) =>
+          second.name.length -
+          first.name.length
+      )
+      .find(
+        (studioPackage) =>
+          packageTitle ===
+            studioPackage.name ||
+          packageTitle.startsWith(
+            `${studioPackage.name} + `
+          )
+      );
+
+    if (!basePackage) {
+      alert(
+        "The original package could not be matched. Add that package in the Packages tab before editing this booking."
+      );
+      return;
+    }
+
+    const parsedExtras =
+      readBookingExtras(
+        booking,
+        packages
+      );
+
+    setSelectedPaymentBooking(null);
+    setEditingBooking(booking);
+
+    setForm({
+      ...EMPTY_FORM,
+      clientName:
+        booking.client_name || "",
+      email: booking.email || "",
+      phone: booking.phone || "",
+      packageId: basePackage.id,
+      shootDate:
+        booking.shoot_date || "",
+      shootTime:
+        booking.shoot_time || "",
+      paymentStatus:
+        booking.payment_status ||
+        "UNPAID",
+      amountPaid: String(
+        booking.amount_paid || 0
+      ),
+      paymentMethod:
+        booking.payment_provider ||
+        "CASH",
+      paymentReference:
+        booking.payment_reference ||
+        "",
+      paymentDate:
+        getTodayInputValue(),
+      additionalItems:
+        parsedExtras.additionalItems,
+      notes: parsedExtras.notes,
+    });
+
+    setShowForm(true);
+  };
 
   const openRecordPayment = (
     booking
@@ -806,8 +1155,16 @@ function BookingsTab({
       }
 
       if (
+        !form.isHistoricalBooking &&
         bookedTimes.includes(
           form.shootTime
+        ) &&
+        !(
+          editingBooking &&
+          editingBooking.shoot_date ===
+            form.shootDate &&
+          editingBooking.shoot_time ===
+            form.shootTime
         )
       ) {
         alert(
@@ -817,6 +1174,7 @@ function BookingsTab({
       }
 
       if (
+        !editingBooking &&
         form.paymentStatus ===
           "PARTIAL" &&
         (
@@ -831,18 +1189,38 @@ function BookingsTab({
         return;
       }
 
+      if (hasInvalidAdditionalItems) {
+        alert(
+          "Please complete or remove each additional item."
+        );
+        return;
+      }
+
       try {
         setIsSaving(true);
 
         const response = await adminFetch(
           "/api/admin-manual-bookings",
           {
-            method: "POST",
+            method: editingBooking
+              ? "PATCH"
+              : "POST",
             headers: {
               "Content-Type":
                 "application/json",
             },
             body: JSON.stringify({
+              action: editingBooking
+                ? "update_booking"
+                : undefined,
+              id:
+                editingBooking?.id ||
+                undefined,
+              isHistoricalBooking:
+                !editingBooking &&
+                form.isHistoricalBooking,
+              historicalWorkflowStatus:
+                form.historicalWorkflowStatus,
               clientName:
                 form.clientName.trim(),
               email:
@@ -859,6 +1237,27 @@ function BookingsTab({
                 form.paymentStatus,
               amountPaid:
                 effectiveAmountPaid,
+              paymentMethod:
+                form.paymentMethod,
+              paymentReference:
+                form.paymentReference.trim(),
+              paymentDate:
+                form.paymentStatus === "UNPAID"
+                  ? ""
+                  : `${form.paymentDate}T12:00:00+08:00`,
+              additionalItems:
+                form.additionalItems.map(
+                  (item) => ({
+                    type: item.type,
+                    packageId:
+                      item.packageId,
+                    name:
+                      item.name.trim(),
+                    price: Number(
+                      item.price || 0
+                    ),
+                  })
+                ),
               notes:
                 form.notes.trim(),
             }),
@@ -878,6 +1277,7 @@ function BookingsTab({
         }
 
         setShowForm(false);
+        setEditingBooking(null);
 
         setForm({
           ...EMPTY_FORM,
@@ -889,7 +1289,11 @@ function BookingsTab({
         await loadBookings();
 
         alert(
-          "Manual booking saved successfully."
+          editingBooking
+            ? "Booking updated successfully."
+            : form.isHistoricalBooking
+              ? "Historical booking saved without staff or client notifications."
+            : "Manual booking saved successfully."
         );
       } catch (error) {
         console.error(
@@ -1626,6 +2030,19 @@ function BookingsTab({
                       </span>
 
                                            <div className="crm-booking-actions">
+  {isUpcomingBooking(booking) && (
+    <button
+      type="button"
+      className="crm-booking-action is-payment"
+      onClick={() =>
+        openEditBooking(booking)
+      }
+    >
+      <Pencil size={14} />
+      Edit Booking
+    </button>
+  )}
+
   {booking.shoot_status === "COMPLETED" ? (
     <span className="crm-booking-paid-label">
       <CheckCircle2 size={14} />
@@ -1750,11 +2167,19 @@ function BookingsTab({
             <div className="admin-drawer-header">
               <div>
                 <p className="admin-eyebrow">
-                  New Studio Booking
+                  {editingBooking
+                    ? "Upcoming Studio Booking"
+                    : form.isHistoricalBooking
+                      ? "Past Studio Record"
+                    : "New Studio Booking"}
                 </p>
 
                 <h2>
-                  Add Manual Booking
+                  {editingBooking
+                    ? "Edit Booking"
+                    : form.isHistoricalBooking
+                      ? "Add Historical Booking"
+                    : "Add Manual Booking"}
                 </h2>
               </div>
 
@@ -1771,8 +2196,11 @@ function BookingsTab({
             </div>
 
             <p className="admin-drawer-intro">
-              Add the client, package,
-              schedule and payment details.
+              {editingBooking
+                ? "Update the client, package, extras, schedule and notes. Payments already received are preserved."
+                : form.isHistoricalBooking
+                  ? "Add a past booking directly to the CRM and revenue reports. No staff or client notifications will be sent, and no Google Calendar event will be created."
+                : "Add the client, package, schedule and payment details."}
             </p>
 
             <form
@@ -1781,6 +2209,53 @@ function BookingsTab({
                 saveManualBooking
               }
             >
+              {!editingBooking && (
+                <label className={`historical-booking-toggle ${
+                  form.isHistoricalBooking
+                    ? "is-active"
+                    : ""
+                }`}>
+                  <input
+                    type="checkbox"
+                    name="isHistoricalBooking"
+                    checked={
+                      form.isHistoricalBooking
+                    }
+                    onChange={updateForm}
+                  />
+
+                  <span>
+                    <strong>
+                      Historical booking
+                    </strong>
+                    <small>
+                      Use for a shoot that already happened. This saves only to the CRM and payment reports—no SMS, email, staff notification, spreadsheet row, or calendar event.
+                    </small>
+                  </span>
+                </label>
+              )}
+
+              {!editingBooking &&
+                form.isHistoricalBooking && (
+                  <label>
+                    Current Workflow Status
+                    <select
+                      name="historicalWorkflowStatus"
+                      value={
+                        form.historicalWorkflowStatus
+                      }
+                      onChange={updateForm}
+                    >
+                      <option value="DELIVERED">
+                        Delivered / Finished
+                      </option>
+                      <option value="FOR_EDITING">
+                        For Editing
+                      </option>
+                    </select>
+                  </label>
+                )}
+
               <div className="admin-form-grid">
                 <label>
                   Client Name
@@ -1836,7 +2311,7 @@ function BookingsTab({
                       Choose package
                     </option>
 
-                    {activePackages.map(
+                    {formPackages.map(
                       (studioPackage) => (
                         <option
                           key={
@@ -1864,10 +2339,15 @@ function BookingsTab({
                   <select
                     name="paymentStatus"
                     value={
-                      form.paymentStatus
+                      displayedPaymentStatus
                     }
                     onChange={
                       updateForm
+                    }
+                    disabled={
+                      Boolean(
+                        editingBooking
+                      )
                     }
                   >
                     <option value="UNPAID">
@@ -1885,12 +2365,192 @@ function BookingsTab({
                 </label>
               </div>
 
+              <section className="manual-booking-extras">
+                <div className="manual-booking-extras-header">
+                  <div>
+                    <strong>
+                      Additional services or shoots
+                    </strong>
+                    <span>
+                      Optional — package costs can be adjusted for 2-for-1 offers or discounts.
+                    </span>
+                  </div>
+
+                  <div className="manual-booking-extras-actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        addAdditionalItem(
+                          "PACKAGE"
+                        )
+                      }
+                    >
+                      <Plus size={14} />
+                      Another package
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        addAdditionalItem(
+                          "CUSTOM"
+                        )
+                      }
+                    >
+                      <Plus size={14} />
+                      Service / extra cost
+                    </button>
+                  </div>
+                </div>
+
+                {form.additionalItems.length ===
+                0 ? (
+                  <p className="manual-booking-extras-empty">
+                    No additional items.
+                  </p>
+                ) : (
+                  <div className="manual-booking-extras-list">
+                    {form.additionalItems.map(
+                      (item) => (
+                          <div
+                            className="manual-booking-extra-row"
+                            key={item.id}
+                          >
+                            {item.type ===
+                            "PACKAGE" ? (
+                              <label>
+                                Additional package
+                                <select
+                                  value={
+                                    item.packageId
+                                  }
+                                  onChange={(event) =>
+                                    selectAdditionalPackage(
+                                      item.id,
+                                      event.target.value
+                                    )
+                                  }
+                                  required
+                                >
+                                  <option value="">
+                                    Choose package
+                                  </option>
+                                  {formPackages.map(
+                                    (
+                                      studioPackage
+                                    ) => (
+                                      <option
+                                        key={
+                                          studioPackage.id
+                                        }
+                                        value={
+                                          studioPackage.id
+                                        }
+                                      >
+                                        {
+                                          studioPackage.name
+                                        }{" "}
+                                        —{" "}
+                                        {money(
+                                          studioPackage.default_price
+                                        )}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </label>
+                            ) : (
+                              <label>
+                                Service name
+                                <input
+                                  value={item.name}
+                                  onChange={(event) =>
+                                    updateAdditionalItem(
+                                      item.id,
+                                      "name",
+                                      event.target.value
+                                    )
+                                  }
+                                  placeholder="Hair and Makeup (HMU)"
+                                  maxLength={100}
+                                  required
+                                />
+                              </label>
+                            )}
+
+                            <label>
+                              Additional cost
+                              <input
+                                type="number"
+                                min={
+                                  item.type ===
+                                  "PACKAGE"
+                                    ? "0"
+                                    : "1"
+                                }
+                                step="1"
+                                value={item.price}
+                                onChange={(event) =>
+                                  updateAdditionalItem(
+                                    item.id,
+                                    "price",
+                                    event.target.value
+                                  )
+                                }
+                                placeholder="0"
+                                required
+                              />
+                            </label>
+
+                            <button
+                              type="button"
+                              className="manual-booking-extra-remove"
+                              onClick={() =>
+                                removeAdditionalItem(
+                                  item.id
+                                )
+                              }
+                              aria-label="Remove additional item"
+                              title="Remove"
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          </div>
+                        )
+                    )}
+                  </div>
+                )}
+
+                {form.additionalItems.length >
+                  0 && (
+                  <div className="manual-booking-extras-total">
+                    <span>
+                      Base package {money(
+                        basePackagePrice
+                      )}
+                    </span>
+                    <strong>
+                      Extras {money(
+                        additionalItemsTotal
+                      )}
+                    </strong>
+                  </div>
+                )}
+              </section>
+
               <div className="admin-form-grid">
                 <label>
-                  Shoot Date
+                  {form.isHistoricalBooking
+                    ? "Past Shoot Date"
+                    : "Shoot Date"}
                   <input
                     name="shootDate"
                     type="date"
+                    max={
+                      form.isHistoricalBooking
+                        ? getTodayInputValue()
+                        : undefined
+                    }
                     value={
                       form.shootDate
                     }
@@ -1913,14 +2573,17 @@ function BookingsTab({
                     }
                     disabled={
                       !form.shootDate ||
-                      isCheckingSlots ||
-                      Boolean(slotError)
+                      (!form.isHistoricalBooking &&
+                        (isCheckingSlots ||
+                          Boolean(slotError)))
                     }
                     required
                   >
                     <option value="">
                       {!form.shootDate
                         ? "Choose a date first"
+                        : form.isHistoricalBooking
+                          ? "Choose past shoot time"
                         : isCheckingSlots
                           ? "Checking times..."
                           : "Choose time"}
@@ -1929,8 +2592,16 @@ function BookingsTab({
                     {MANUAL_BOOKING_SLOTS.map(
                       (slot) => {
                         const isBooked =
+                          !form.isHistoricalBooking &&
                           bookedTimes.includes(
                             slot.value
+                          ) &&
+                          !(
+                            editingBooking &&
+                            editingBooking.shoot_date ===
+                              form.shootDate &&
+                            editingBooking.shoot_time ===
+                              slot.value
                           );
 
                         return (
@@ -1973,8 +2644,10 @@ function BookingsTab({
                     max={packagePrice}
                     step="1"
                     value={
-                      form.paymentStatus ===
-                      "PAID"
+                      editingBooking
+                        ? effectiveAmountPaid
+                        : form.paymentStatus ===
+                            "PAID"
                         ? packagePrice
                         : form.paymentStatus ===
                             "UNPAID"
@@ -1985,8 +2658,11 @@ function BookingsTab({
                       updateForm
                     }
                     disabled={
+                      Boolean(
+                        editingBooking
+                      ) ||
                       form.paymentStatus !==
-                      "PARTIAL"
+                        "PARTIAL"
                     }
                   />
                 </label>
@@ -2002,6 +2678,61 @@ function BookingsTab({
                 </label>
               </div>
 
+              {!editingBooking &&
+                form.paymentStatus !==
+                  "UNPAID" && (
+                <>
+                  <div className="admin-form-grid">
+                    <label>
+                      Payment Method
+                      <select
+                        name="paymentMethod"
+                        value={form.paymentMethod}
+                        onChange={updateForm}
+                        required
+                      >
+                        <option value="CASH">
+                          Cash
+                        </option>
+                        <option value="GCASH">
+                          GCash
+                        </option>
+                        <option value="CARD">
+                          Card
+                        </option>
+                        <option value="BANK_TRANSFER">
+                          Bank Transfer
+                        </option>
+                        <option value="OTHER">
+                          Other
+                        </option>
+                      </select>
+                    </label>
+
+                    <label>
+                      Payment Date
+                      <input
+                        name="paymentDate"
+                        type="date"
+                        value={form.paymentDate}
+                        onChange={updateForm}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    Payment Reference
+                    <input
+                      name="paymentReference"
+                      value={form.paymentReference}
+                      onChange={updateForm}
+                      placeholder="Optional receipt or transaction reference"
+                    />
+                  </label>
+                </>
+              )}
+
               <label>
                 Notes
                 <textarea
@@ -2015,7 +2746,7 @@ function BookingsTab({
               <div className="manual-booking-summary">
                 <div>
                   <span>
-                    Package Price
+                    Booking Total
                   </span>
                   <strong>
                     {money(packagePrice)}
@@ -2051,12 +2782,17 @@ function BookingsTab({
                   className="admin-btn admin-btn-primary"
                   disabled={
                     isSaving ||
-                    !selectedPackage
+                    !selectedPackage ||
+                    hasInvalidAdditionalItems
                   }
                 >
                   {isSaving
                     ? "Saving..."
-                    : "Save Manual Booking"}
+                    : editingBooking
+                      ? "Save Changes"
+                      : form.isHistoricalBooking
+                        ? "Save Historical Booking"
+                      : "Save Manual Booking"}
                 </button>
 
                 <button

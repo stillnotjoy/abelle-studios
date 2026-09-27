@@ -12,7 +12,10 @@ import AdminTopbar from "./admin/components/AdminTopbar";
 import DashboardTab from "./admin/DashboardTab";
 import CalendarTab from "./admin/CalendarTab";
 import BookingsTab from "./admin/BookingsTab";
+import CustomersTab from "./admin/CustomersTab";
 import PostProductionTab from "./admin/PostProductionTab";
+import RevenueTab from "./admin/RevenueTab";
+import TaxTab from "./admin/TaxTab";
 import DiscountCodesTab from "./admin/DiscountCodesTab";
 import PackagesTab from "./admin/PackagesTab";
 import BlockedDatesTab from "./admin/BlockedDatesTab";
@@ -37,10 +40,28 @@ const PAGE_DETAILS = {
       "Manage online, manual, walk-in, and pay-in-studio bookings.",
   },
 
+  Customers: {
+    title: "Customers",
+    description:
+      "See each client's contact details, booking history, spending, and outstanding balances.",
+  },
+
   "Editing Queue": {
     title: "Editing Queue",
     description:
       "Move completed shoots through editing, file preparation, and client delivery.",
+  },
+
+  Revenue: {
+    title: "Revenue Tracker",
+    description:
+      "Track collected payments, booked sales, outstanding balances, and payment trends.",
+  },
+
+  "Tax / BIR": {
+    title: "Tax / BIR Compliance",
+    description:
+      "Track filing deadlines, estimated tax, payments, expenses, and BIR compliance history.",
   },
 
   "Discount Codes": {
@@ -276,9 +297,21 @@ function Admin() {
               />
             )}
 
+            {activeTab === "Customers" && (
+              <CustomersTab />
+            )}
+
             {activeTab ===
               "Editing Queue" && (
               <PostProductionTab />
+            )}
+
+            {activeTab === "Revenue" && (
+              <RevenueTab />
+            )}
+
+            {activeTab === "Tax / BIR" && (
+              <TaxTab />
             )}
 
             {activeTab ===
