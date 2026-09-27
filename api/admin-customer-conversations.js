@@ -118,6 +118,63 @@ function getExpectedSecret() {
   );
 }
 
+function normalizeSupabaseConversation(row, index) {
+  const type = row.type || "email";
+
+  return {
+    id: row.id || `${type}-${index}`,
+    text: row.message || "",
+    subject: row.subject || "",
+    date: row.created_at || "",
+    direction: row.direction || "outbound",
+    status: row.status || "sent",
+    type,
+    provider: row.provider || "supabase",
+    bookingReference: row.booking_reference || "",
+  };
+}
+
+function normalizeActivity(row, index) {
+  return {
+    id: row.id || `activity-${index}`,
+    date: row.created_at || "",
+    type: row.activity_type || "system_event",
+    title: row.title || "Customer activity",
+    description: row.description || "",
+    oldValue: row.old_value || "",
+    newValue: row.new_value || "",
+    createdBy: row.created_by || "system",
+    bookingReference: row.booking_reference || "",
+  };
+}
+
+function sortByDateAscending(items) {
+  return [...items].sort((a, b) => {
+    const first = new Date(a.date).getTime();
+    const second = new Date(b.date).getTime();
+
+    if (Number.isNaN(first) || Number.isNaN(second)) {
+      return 0;
+    }
+
+    return first - second;
+  });
+}
+
+function sortByDateDescending(items) {
+  return [...items].sort((a, b) => {
+    const first = new Date(a.date).getTime();
+    const second = new Date(b.date).getTime();
+
+    if (Number.isNaN(first) || Number.isNaN(second)) {
+      return 0;
+    }
+
+    return second - first;
+  });
+}
+
+
 async function handleConversationFetch(request, response) {
   if (!GOOGLE_APPS_SCRIPT_URL || !GOOGLE_APPS_SCRIPT_SECRET) {
     return response.status(500).json({
@@ -126,22 +183,27 @@ async function handleConversationFetch(request, response) {
   }
 
   const phone = String(request.query.phone || "").trim();
+  const email = String(request.query.email || "").trim().toLowerCase();
   const normalizedPhone = normalizePhone(phone);
 
-  if (!normalizedPhone) {
+  if (!normalizedPhone && !email) {
     return response.status(400).json({
-      error: "A customer mobile number is required.",
+      error: "A customer mobile number or email address is required.",
     });
   }
 
-  const appsScriptUrl = new URL(GOOGLE_APPS_SCRIPT_URL);
-  appsScriptUrl.searchParams.set("action", "philsms_history");
-  appsScriptUrl.searchParams.set("secret", GOOGLE_APPS_SCRIPT_SECRET);
-  appsScriptUrl.searchParams.set("phone", phone);
-
-  console.log("Apps Script URL being called:", appsScriptUrl.toString());
+  let smsMessages = [];
+  let supabaseMessages = [];
+  let activities = [];
 
   try {
+    const appsScriptUrl = new URL(GOOGLE_APPS_SCRIPT_URL);
+    appsScriptUrl.searchParams.set("action", "philsms_history");
+    appsScriptUrl.searchParams.set("secret", GOOGLE_APPS_SCRIPT_SECRET);
+    appsScriptUrl.searchParams.set("phone", phone);
+
+    console.log("Apps Script URL being called:", appsScriptUrl.toString());
+
     const appsScriptResponse = await fetch(appsScriptUrl.toString(), {
       method: "GET",
       headers: APPS_SCRIPT_REQUEST_HEADERS,
@@ -160,44 +222,90 @@ async function handleConversationFetch(request, response) {
     }
 
     if (!appsScriptResponse.ok || payload?.ok === false) {
-      return response.status(502).json({
-        error:
-          payload?.error ||
-          payload?.message ||
-          "Could not load PhilSMS conversation history.",
-      });
+      console.warn("Could not load PhilSMS conversation history:", payload);
+    } else {
+      const rawMessages = getMessagesFromPayload(payload);
+
+      smsMessages = rawMessages.map((message, index) => ({
+        ...normalizeMessage(message, index),
+        type: "sms",
+        provider: "philsms",
+      }));
+    }
+  } catch (error) {
+    console.warn("PhilSMS history fetch failed:", error);
+  }
+
+  try {
+    const supabase = getSupabaseClient();
+
+    let conversationQuery = supabase
+      .from("customer_conversations")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .limit(100);
+
+    if (normalizedPhone && email) {
+      conversationQuery = conversationQuery.or(
+        `normalized_phone.eq.${normalizedPhone},customer_email.eq.${email}`
+      );
+    } else if (normalizedPhone) {
+      conversationQuery = conversationQuery.eq("normalized_phone", normalizedPhone);
+    } else {
+      conversationQuery = conversationQuery.eq("customer_email", email);
     }
 
-    const rawMessages = getMessagesFromPayload(payload);
+    const { data: conversationRows, error: conversationError } =
+      await conversationQuery;
 
-    console.log("Apps Script payload:", JSON.stringify(payload).slice(0, 3000));
-    console.log("Raw messages count:", rawMessages.length);
-    console.log("Raw messages sample:", JSON.stringify(rawMessages[0] || null));
+    if (conversationError) {
+      throw conversationError;
+    }
 
-    const messages = rawMessages
-      .map(normalizeMessage)
-      .sort((a, b) => {
-        const first = new Date(a.date).getTime();
-        const second = new Date(b.date).getTime();
+    supabaseMessages = (conversationRows || []).map(normalizeSupabaseConversation);
 
-        if (Number.isNaN(first) || Number.isNaN(second)) {
-          return 0;
-        }
+    let activityQuery = supabase
+      .from("customer_activity_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-        return first - second;
-      });
+    if (normalizedPhone && email) {
+      activityQuery = activityQuery.or(
+        `normalized_phone.eq.${normalizedPhone},customer_email.eq.${email}`
+      );
+    } else if (normalizedPhone) {
+      activityQuery = activityQuery.eq("normalized_phone", normalizedPhone);
+    } else {
+      activityQuery = activityQuery.eq("customer_email", email);
+    }
 
-    return response.status(200).json({
-      ok: true,
-      messages,
-    });
+    const { data: activityRows, error: activityError } = await activityQuery;
+
+    if (activityError) {
+      throw activityError;
+    }
+
+    activities = (activityRows || []).map(normalizeActivity);
   } catch (error) {
-    console.error("PhilSMS history fetch failed:", error);
+    console.error("Supabase customer conversation fetch failed:", error);
 
     return response.status(500).json({
-      error: "Could not contact Apps Script for SMS history.",
+      error: "Could not load saved customer conversation logs.",
+      details: error.message,
     });
   }
+
+  const messages = sortByDateAscending([
+    ...smsMessages,
+    ...supabaseMessages,
+  ]);
+
+  return response.status(200).json({
+    ok: true,
+    messages,
+    activities: sortByDateDescending(activities),
+  });
 }
 
 async function handleCustomerEventLog(request, response) {
