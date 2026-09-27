@@ -1,0 +1,497 @@
+.crm-revenue-page {
+  display: grid;
+  gap: 22px;
+}
+
+.crm-revenue-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #e4e0da;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.crm-revenue-range-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.crm-revenue-range-controls label {
+  display: grid;
+  gap: 7px;
+  color: #706a62;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.crm-revenue-range-controls select,
+.crm-revenue-range-controls input {
+  min-width: 170px;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid #dcd7d0;
+  border-radius: 10px;
+  background: #fff;
+  color: #171512;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.crm-revenue-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #171512;
+  border-radius: 10px;
+  background: #171512;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crm-revenue-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.crm-revenue-error,
+.crm-revenue-history-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.crm-revenue-error {
+  border: 1px solid #f0caca;
+  background: #fff3f3;
+  color: #a52a2a;
+}
+
+.crm-revenue-history-note {
+  border: 1px solid #ead8b9;
+  background: #fff9ef;
+  color: #6b5128;
+}
+
+.crm-revenue-history-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.crm-revenue-history-note p {
+  margin: 0;
+}
+
+.crm-revenue-loading {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 320px;
+  border: 1px solid #e4e0da;
+  border-radius: 18px;
+  background: #fff;
+  color: #7e766c;
+}
+
+.crm-revenue-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.crm-revenue-summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e4e0da;
+  border-radius: 17px;
+  background: #fff;
+}
+
+.crm-revenue-summary-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: #f5f0e7;
+  color: #8e5c16;
+}
+
+.crm-revenue-summary-card.is-green .crm-revenue-summary-icon {
+  background: #e8f6ee;
+  color: #197743;
+}
+
+.crm-revenue-summary-card.is-red .crm-revenue-summary-icon {
+  background: #fdecec;
+  color: #c13232;
+}
+
+.crm-revenue-summary-card.is-blue .crm-revenue-summary-icon {
+  background: #eaf1fb;
+  color: #376da9;
+}
+
+.crm-revenue-summary-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.crm-revenue-summary-card span:not(.crm-revenue-summary-icon) {
+  color: #6f685f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-revenue-summary-card strong {
+  overflow: hidden;
+  color: #171512;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(25px, 2vw, 32px);
+  font-weight: 500;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-revenue-summary-card small {
+  color: #968e83;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.crm-revenue-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(270px, 0.7fr);
+  gap: 16px;
+}
+
+.crm-revenue-panel {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #e4e0da;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.crm-revenue-trend-panel {
+  grid-row: span 2;
+}
+
+.crm-revenue-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.crm-revenue-panel-heading p,
+.crm-revenue-panel-heading h2 {
+  margin: 0;
+}
+
+.crm-revenue-panel-heading p {
+  margin-bottom: 5px;
+  color: #a06d25;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.crm-revenue-panel-heading h2 {
+  color: #171512;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.crm-revenue-panel-heading > strong {
+  color: #171512;
+  font-size: 17px;
+}
+
+.crm-revenue-panel-heading > span {
+  color: #91897f;
+  font-size: 12px;
+}
+
+.crm-revenue-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 310px;
+  padding-top: 15px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.crm-revenue-chart::-webkit-scrollbar {
+  display: none;
+}
+
+.crm-revenue-chart-column {
+  display: grid;
+  grid-template-rows: 24px minmax(180px, 1fr) 24px;
+  gap: 7px;
+  min-width: 55px;
+  flex: 1 0 55px;
+  text-align: center;
+}
+
+.crm-revenue-chart-value {
+  overflow: hidden;
+  color: #6f685f;
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-revenue-chart-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  border-bottom: 1px solid #ded9d2;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 24%,
+    #f3f0ec 25%
+  );
+}
+
+.crm-revenue-chart-track i {
+  display: block;
+  width: min(34px, 64%);
+  min-height: 5px;
+  border-radius: 8px 8px 2px 2px;
+  background: linear-gradient(180deg, #b98031, #7d4f14);
+}
+
+.crm-revenue-chart-column small {
+  color: #81796f;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.crm-revenue-breakdown-list {
+  display: grid;
+  gap: 18px;
+}
+
+.crm-revenue-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+}
+
+.crm-revenue-breakdown-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.crm-revenue-breakdown-row strong,
+.crm-revenue-breakdown-row b {
+  color: #26221d;
+  font-size: 12px;
+}
+
+.crm-revenue-breakdown-row span:not(.crm-revenue-breakdown-track) {
+  color: #9a9288;
+  font-size: 10px;
+}
+
+.crm-revenue-breakdown-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f1eee9;
+}
+
+.crm-revenue-breakdown-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #a86d20;
+}
+
+.crm-revenue-empty-small {
+  margin: 0;
+  color: #928a80;
+  font-size: 13px;
+}
+
+.crm-revenue-panel-empty {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 210px;
+  color: #a39b91;
+  text-align: center;
+}
+
+.crm-revenue-panel-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.crm-revenue-transactions-panel {
+  padding-bottom: 8px;
+}
+
+.crm-revenue-table-wrap {
+  overflow-x: auto;
+}
+
+.crm-revenue-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.crm-revenue-table th,
+.crm-revenue-table td {
+  padding: 14px 12px;
+  border-top: 1px solid #eeeae5;
+  color: #4f4942;
+  font-size: 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.crm-revenue-table th {
+  border-top: 0;
+  color: #8c847a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.crm-revenue-table td:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+
+.crm-revenue-table td:nth-child(2) strong {
+  color: #1e1b17;
+  font-size: 12px;
+}
+
+.crm-revenue-table td:nth-child(2) span {
+  color: #9a9288;
+  font-size: 10px;
+}
+
+.crm-revenue-table td:last-child {
+  color: #176e3f;
+  font-weight: 800;
+  text-align: right;
+}
+
+.crm-revenue-table td:last-child.is-refund {
+  color: #b83232;
+}
+
+.crm-revenue-transaction-type {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eaf6ef;
+  color: #26714a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.crm-revenue-transaction-type.is-history {
+  background: #f4eee4;
+  color: #8a642d;
+}
+
+@keyframes crm-revenue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.crm-revenue-spinning {
+  animation: crm-revenue-spin 0.9s linear infinite;
+}
+
+@media (max-width: 1180px) {
+  .crm-revenue-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .crm-revenue-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-revenue-trend-panel {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .crm-revenue-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .crm-revenue-range-controls,
+  .crm-revenue-range-controls label {
+    width: 100%;
+  }
+
+  .crm-revenue-range-controls select,
+  .crm-revenue-range-controls input,
+  .crm-revenue-refresh {
+    width: 100%;
+  }
+
+  .crm-revenue-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-revenue-panel,
+  .crm-revenue-summary-card {
+    padding: 17px;
+  }
+
+  .crm-revenue-chart {
+    min-height: 265px;
+  }
+}

@@ -5,6 +5,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
+
 function sendJson(response, status, data) {
   return response.status(status).json(data);
 }
@@ -159,6 +165,155 @@ async function saveOnlineBookingToCrm({
     : crmData;
 }
 
+function normalizeCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+
+async function supabaseRequest(path, options = {}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase environment variables are missing.");
+  }
+
+  const supabaseResponse = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  const responseText = await supabaseResponse.text();
+
+  let data = null;
+
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = responseText;
+  }
+
+  if (!supabaseResponse.ok) {
+    console.error("Supabase API error:", data);
+
+    throw new Error(
+      typeof data === "object" && data?.message
+        ? data.message
+        : "Supabase request failed."
+    );
+  }
+
+  return data;
+}
+
+function calculateDiscountAmount(discount, packagePrice) {
+  const value = Number(discount.discount_value || 0);
+
+  if (discount.discount_type === "fixed") {
+    return Math.min(value, packagePrice);
+  }
+
+  if (discount.discount_type === "percent") {
+    return Math.round(packagePrice * (value / 100));
+  }
+
+  return 0;
+}
+
+async function validateDiscountCode(request, response) {
+  const { code, packagePrice } = request.body || {};
+
+  const cleanCode = normalizeCode(code);
+  const numericPackagePrice = Number(packagePrice || 0);
+
+  if (!cleanCode) {
+    return sendJson(response, 200, {
+      valid: false,
+      error: "Please enter a discount code.",
+    });
+  }
+
+  if (!numericPackagePrice || numericPackagePrice <= 0) {
+    return sendJson(response, 400, {
+      valid: false,
+      error: "Invalid package price.",
+    });
+  }
+
+  const encodedCode = encodeURIComponent(cleanCode);
+
+  const discounts = await supabaseRequest(
+    `discount_codes?code=eq.${encodedCode}&select=*&limit=1`
+  );
+
+  const discount = discounts?.[0];
+
+  if (!discount) {
+    return sendJson(response, 200, {
+      valid: false,
+      error: "Discount code not found.",
+    });
+  }
+
+  if (!discount.is_active) {
+    return sendJson(response, 200, {
+      valid: false,
+      error: "This discount code is inactive.",
+    });
+  }
+
+  const now = new Date();
+
+  if (discount.starts_at) {
+    const startDate = new Date(discount.starts_at);
+    startDate.setHours(0, 0, 0, 0);
+
+    if (startDate > now) {
+      return sendJson(response, 200, {
+        valid: false,
+        error: "This discount code is not active yet.",
+      });
+    }
+  }
+
+  if (discount.ends_at) {
+    const endDate = new Date(discount.ends_at);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (endDate < now) {
+      return sendJson(response, 200, {
+        valid: false,
+        error: "This discount code has expired.",
+      });
+    }
+  }
+
+  const discountAmount = calculateDiscountAmount(
+    discount,
+    numericPackagePrice
+  );
+
+  if (discountAmount <= 0) {
+    return sendJson(response, 200, {
+      valid: false,
+      error: "This discount code could not be applied.",
+    });
+  }
+
+  return sendJson(response, 200, {
+    valid: true,
+    code: discount.code,
+    discountType: discount.discount_type,
+    discountValue: Number(discount.discount_value),
+    discountAmount,
+    message:
+      discount.discount_type === "fixed"
+        ? `₱${discountAmount.toLocaleString()} discount applied.`
+        : `${Number(discount.discount_value)}% discount applied.`,
+  });
+}
+
 export default async function handler(request, response) {
   if (request.method !== "POST") {
     return sendJson(response, 405, {
@@ -167,6 +322,11 @@ export default async function handler(request, response) {
   }
 
   try {
+    const action = cleanText(request.query?.action);
+
+    if (action === "validate_discount") {
+      return validateDiscountCode(request, response);
+    }
     const appsScriptUrl =
       process.env.GOOGLE_APPS_SCRIPT_URL;
 
@@ -324,6 +484,7 @@ export default async function handler(request, response) {
           {
             method: "POST",
             headers: {
+              ...APPS_SCRIPT_REQUEST_HEADERS,
               "Content-Type": "application/json",
             },
             body: JSON.stringify(bookingPayload),

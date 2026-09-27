@@ -1,0 +1,916 @@
+.crm-tax-page {
+  display: grid;
+  gap: 18px;
+  color: #171512;
+}
+
+.crm-tax-disclaimer,
+.crm-tax-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+}
+
+.crm-tax-disclaimer {
+  border: 1px solid #dce8de;
+  background: #f3faf5;
+  color: #215c39;
+}
+
+.crm-tax-disclaimer > svg,
+.crm-tax-error > svg {
+  flex: 0 0 auto;
+}
+
+.crm-tax-disclaimer > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crm-tax-disclaimer strong {
+  font-size: 13px;
+}
+
+.crm-tax-disclaimer span {
+  color: #568066;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.crm-tax-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #c9dcca;
+  border-radius: 10px;
+  background: #fff;
+  color: #215c39;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crm-tax-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.crm-tax-error {
+  border: 1px solid #efc4c4;
+  background: #fff1f1;
+  color: #a52b2b;
+  font-size: 13px;
+}
+
+.crm-tax-email-active {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border: 1px solid #d9e8dc;
+  border-radius: 12px;
+  background: #fbfefb;
+  color: #3f6e4f;
+  font-size: 11px;
+}
+
+.crm-tax-email-active svg {
+  flex: 0 0 auto;
+  color: #1f8149;
+}
+
+.crm-tax-view-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 5px;
+  border: 1px solid #e4e0da;
+  border-radius: 13px;
+  background: #fff;
+  scrollbar-width: none;
+}
+
+.crm-tax-view-tabs::-webkit-scrollbar,
+.crm-tax-table-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.crm-tax-view-tabs button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #716a61;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crm-tax-view-tabs button.is-active {
+  background: #171512;
+  color: #fff;
+}
+
+.crm-tax-priority-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.crm-tax-priority-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 15px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e4e0da;
+  border-radius: 17px;
+  background: #fff;
+}
+
+.crm-tax-priority-card.is-overdue {
+  border-color: #edbebe;
+  background: linear-gradient(145deg, #fffafa 0%, #fff 70%);
+}
+
+.crm-tax-priority-card.is-next {
+  border-color: #e7d4b5;
+  background: linear-gradient(145deg, #fffaf2 0%, #fff 70%);
+}
+
+.crm-tax-card-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 13px;
+  background: #f4eee4;
+  color: #9a6419;
+}
+
+.crm-tax-priority-card.is-overdue .crm-tax-card-icon {
+  background: #fdeaea;
+  color: #bd2f2f;
+}
+
+.crm-tax-priority-card.is-paid .crm-tax-card-icon {
+  background: #e6f4e9;
+  color: #1d7844;
+}
+
+.crm-tax-card-heading {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.crm-tax-card-heading p,
+.crm-tax-panel header p {
+  margin: 0;
+  color: #9b681f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.crm-tax-card-heading h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 29px;
+  font-weight: 500;
+  line-height: 1.12;
+}
+
+.crm-tax-card-heading > span {
+  overflow: hidden;
+  color: #837b71;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+}
+
+.crm-tax-priority-details {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 11px;
+  padding-top: 15px;
+  border-top: 1px solid #eeeae5;
+}
+
+.crm-tax-reminder-list {
+  display: grid;
+  gap: 8px;
+}
+
+.crm-tax-reminder-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid #e7dfd3;
+  border-radius: 11px;
+  background: #fffbf4;
+  color: #96631e;
+}
+
+.crm-tax-reminder-list > div.is-overdue {
+  border-color: #efc5c5;
+  background: #fff5f5;
+  color: #b12e2e;
+}
+
+.crm-tax-reminder-list > div > div {
+  display: grid;
+  gap: 2px;
+}
+
+.crm-tax-reminder-list strong {
+  color: #2d2925;
+  font-size: 11px;
+}
+
+.crm-tax-reminder-list span {
+  font-size: 10px;
+}
+
+.crm-tax-reminder-list b {
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.crm-tax-status-pair,
+.crm-tax-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.crm-tax-overdue-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #a62b2b;
+  font-size: 11px;
+}
+
+.crm-tax-overdue-line span {
+  white-space: nowrap;
+}
+
+.crm-tax-period-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.crm-tax-panel {
+  min-width: 0;
+  padding: 21px;
+  border: 1px solid #e4e0da;
+  border-radius: 17px;
+  background: #fff;
+}
+
+.crm-tax-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 19px;
+}
+
+.crm-tax-panel > header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.crm-tax-panel header h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.crm-tax-panel > header > svg {
+  color: #a36b1e;
+}
+
+.crm-tax-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #eeeae5;
+  border-radius: 13px;
+  background: #eeeae5;
+}
+
+.crm-tax-metric {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px;
+  background: #fff;
+}
+
+.crm-tax-metric > span {
+  color: #7f776e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.crm-tax-metric > strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.crm-tax-metric > small {
+  color: #9a9288;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.crm-tax-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.crm-tax-snapshot-grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  border: 1px solid #e9e5df;
+  border-radius: 13px;
+  background: #fdfcfb;
+}
+
+.crm-tax-snapshot-grid strong {
+  font-size: 17px;
+}
+
+.crm-tax-snapshot-grid > div > span:not(.crm-tax-status) {
+  color: #847d73;
+  font-size: 11px;
+}
+
+.crm-tax-snapshot-grid b {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.crm-tax-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 25px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f2f0ed;
+  color: #625d56;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.crm-tax-status.is-overdue,
+.crm-tax-status.is-payment.is-payment_pending {
+  background: #fde8e8;
+  color: #b52c2c;
+}
+
+.crm-tax-status.is-due_soon,
+.crm-tax-status.is-due_today,
+.crm-tax-status.is-payment.is-for_verification,
+.crm-tax-status.is-payment.is-partially_paid {
+  background: #fff1d9;
+  color: #945b0d;
+}
+
+.crm-tax-status.is-filed,
+.crm-tax-status.is-completed,
+.crm-tax-status.is-payment.is-paid,
+.crm-tax-status.is-payment.is-no_payment_required,
+.crm-tax-status.is-payment.is-remitted,
+.crm-tax-status.is-applicable {
+  background: #e4f4e9;
+  color: #1e7543;
+}
+
+.crm-tax-status.is-prepared,
+.crm-tax-status.is-payment.is-withheld,
+.crm-tax-status.is-payment.is-confirmed {
+  background: #e8eef8;
+  color: #365f98;
+}
+
+.crm-tax-table-panel {
+  overflow: hidden;
+}
+
+.crm-tax-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+  scrollbar-width: none;
+}
+
+.crm-tax-table {
+  width: 100%;
+  min-width: 1010px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.crm-tax-table th {
+  padding: 11px 10px;
+  border-bottom: 1px solid #ded9d2;
+  color: #7e766c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.crm-tax-table td {
+  padding: 13px 10px;
+  border-bottom: 1px solid #eeeae5;
+  color: #4c4741;
+  vertical-align: middle;
+}
+
+.crm-tax-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.crm-tax-table tbody tr.is-overdue {
+  background: #fff8f8;
+}
+
+.crm-tax-table td > strong,
+.crm-tax-table td > span:not(.crm-tax-status) {
+  display: block;
+}
+
+.crm-tax-table td > strong {
+  color: #171512;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.crm-tax-table td > span:not(.crm-tax-status) {
+  max-width: 180px;
+  margin-top: 3px;
+  color: #8b8379;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.crm-tax-row-actions {
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+.crm-tax-row-actions button {
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid #dcd6cf;
+  border-radius: 8px;
+  background: #fff;
+  color: #413c36;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.crm-tax-row-actions button:hover {
+  border-color: #987039;
+  color: #7d5012;
+}
+
+.crm-tax-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.crm-tax-button.primary {
+  border: 1px solid #171512;
+  background: #171512;
+  color: #fff;
+}
+
+.crm-tax-button.secondary {
+  border: 1px solid #d9d3cb;
+  background: #fff;
+  color: #4f4942;
+}
+
+.crm-tax-button.compact {
+  min-height: 35px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+
+.crm-tax-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.crm-tax-circular-list {
+  display: grid;
+  gap: 15px;
+}
+
+.crm-tax-circular-description,
+.crm-tax-circular-note {
+  color: #5f5952;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.crm-tax-circular-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 16px 0;
+}
+
+.crm-tax-circular-grid .crm-tax-metric {
+  border: 1px solid #e9e4de;
+  border-radius: 11px;
+  background: #fdfcfb;
+}
+
+.crm-tax-circular-note {
+  padding: 11px 13px;
+  border-left: 3px solid #d4ab6b;
+  background: #fffaf1;
+}
+
+.crm-tax-circular-controls {
+  display: flex;
+  margin-top: 15px;
+}
+
+.crm-tax-circular-controls label {
+  display: grid;
+  gap: 7px;
+  color: #736c64;
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.crm-tax-circular-controls select {
+  min-width: 250px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dcd6cf;
+  border-radius: 9px;
+  background: #fff;
+  color: #171512;
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.crm-tax-source-note {
+  display: block;
+  margin-top: 13px;
+  color: #9a9288;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.crm-tax-history-list {
+  display: grid;
+}
+
+.crm-tax-history-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid #eeeae5;
+}
+
+.crm-tax-history-list > div:last-child {
+  border-bottom: 0;
+}
+
+.crm-tax-history-icon {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+  background: #f3eee6;
+  color: #96621c;
+}
+
+.crm-tax-history-list > div > div {
+  display: grid;
+  gap: 2px;
+}
+
+.crm-tax-history-list strong {
+  font-size: 12px;
+}
+
+.crm-tax-history-list span,
+.crm-tax-history-list p {
+  margin: 0;
+  color: #817970;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.crm-tax-modal-backdrop {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: rgba(20, 18, 15, 0.64);
+  backdrop-filter: blur(4px);
+}
+
+.crm-tax-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+  scrollbar-width: none;
+}
+
+.crm-tax-modal::-webkit-scrollbar {
+  display: none;
+}
+
+.crm-tax-modal > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 21px 23px;
+  border-bottom: 1px solid #e6e1da;
+}
+
+.crm-tax-modal > header p,
+.crm-tax-modal > header h2,
+.crm-tax-modal > header span {
+  margin: 0;
+}
+
+.crm-tax-modal > header p {
+  margin-bottom: 4px;
+  color: #9a651d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.crm-tax-modal > header h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  font-weight: 500;
+}
+
+.crm-tax-modal > header span {
+  display: block;
+  margin-top: 4px;
+  color: #817970;
+  font-size: 11px;
+}
+
+.crm-tax-modal > header button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ddd7cf;
+  border-radius: 10px;
+  background: #fff;
+  color: #171512;
+  cursor: pointer;
+}
+
+.crm-tax-modal-form {
+  display: grid;
+  gap: 17px;
+  padding: 22px;
+}
+
+.crm-tax-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.crm-tax-modal-form label {
+  display: grid;
+  gap: 7px;
+  color: #59534c;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.crm-tax-modal-form input,
+.crm-tax-modal-form select,
+.crm-tax-modal-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #dcd6cf;
+  border-radius: 9px;
+  background: #fff;
+  color: #171512;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.crm-tax-modal-form textarea {
+  resize: vertical;
+}
+
+.crm-tax-modal-form input:disabled {
+  background: #f4f2ef;
+  color: #756e66;
+}
+
+.crm-tax-form-warning,
+.crm-tax-expense-preview {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #eed8b7;
+  border-radius: 11px;
+  background: #fff9ee;
+  color: #765a2e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.crm-tax-expense-preview {
+  display: grid;
+  gap: 3px;
+}
+
+.crm-tax-expense-preview span,
+.crm-tax-expense-preview small {
+  font-size: 10px;
+}
+
+.crm-tax-expense-preview strong {
+  color: #171512;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.crm-tax-modal-form footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 4px;
+}
+
+.crm-tax-loading {
+  display: grid;
+  place-items: center;
+  gap: 11px;
+  min-height: 320px;
+  border: 1px solid #e4e0da;
+  border-radius: 17px;
+  background: #fff;
+  color: #827a70;
+  font-size: 12px;
+}
+
+.is-spinning {
+  animation: crm-tax-spin 0.8s linear infinite;
+}
+
+@keyframes crm-tax-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .crm-tax-priority-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crm-tax-priority-card.is-paid {
+    grid-column: 1 / -1;
+  }
+
+  .crm-tax-snapshot-grid,
+  .crm-tax-circular-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .crm-tax-disclaimer {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .crm-tax-refresh {
+    width: 100%;
+  }
+
+  .crm-tax-priority-grid,
+  .crm-tax-period-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-tax-priority-card.is-paid {
+    grid-column: auto;
+  }
+
+  .crm-tax-panel,
+  .crm-tax-priority-card {
+    padding: 16px;
+  }
+
+  .crm-tax-modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .crm-tax-modal {
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .crm-tax-metric-grid,
+  .crm-tax-snapshot-grid,
+  .crm-tax-circular-grid,
+  .crm-tax-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-tax-circular-controls select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .crm-tax-modal-form footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["sin1"],
   "rewrites": [
+    {
+      "source": "/api/packages",
+      "destination": "/api/admin-packages?public=1"
+    },
     {
       "source": "/admin",
       "destination": "/index.html"

@@ -4,11 +4,18 @@ import {
   createHmac,
   timingSafeEqual,
 } from "node:crypto";
+import { recordPaymentTransaction } from "../server/paymentLedger.js";
 
 export const config = {
   api: {
     bodyParser: false,
   },
+};
+
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
 };
 
 async function readRawBody(request) {
@@ -449,8 +456,28 @@ export default async function handler(request, response) {
     const amountPaid = Number(metadata.amountToPay || metadata.totalToPayNow || 0);
     const remainingBalance = Number(metadata.remainingBalance || 0);
 
+    const bookingReference =
+      metadata.bookingReference ||
+      paidAttempt?.booking_reference ||
+      checkoutAttributes.reference_number ||
+      "";
+
+    if (!bookingReference) {
+      console.error(
+        "Missing booking reference from PayMongo metadata:",
+        metadata
+      );
+
+      return response.status(400).json({
+        error: "Missing booking reference from PayMongo metadata.",
+      });
+    }
+
     const bookingPayload = {
       secret: appsScriptSecret,
+
+      bookingReference,
+      source: "O",
 
       name: metadata.name || "",
       email: metadata.email || "",
@@ -493,6 +520,7 @@ export default async function handler(request, response) {
     const calendarResponse = await fetch(appsScriptUrl, {
       method: "POST",
       headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(bookingPayload),
@@ -523,12 +551,6 @@ export default async function handler(request, response) {
       });
     }
 
-    const bookingReference =
-      metadata.bookingReference ||
-      paidAttempt?.booking_reference ||
-      checkoutAttributes.reference_number ||
-      "";
-
     const crmBooking =
       await savePaidBookingToCrm({
         bookingReference,
@@ -538,6 +560,33 @@ export default async function handler(request, response) {
         paidAttempt,
         calendarData: calendarJson,
       });
+
+    if (crmBooking && amountPaid > 0) {
+      const eventCreatedAt =
+        event?.data?.attributes?.created_at;
+      const paymentDate =
+        typeof eventCreatedAt === "number"
+          ? new Date(
+              eventCreatedAt < 1000000000000
+                ? eventCreatedAt * 1000
+                : eventCreatedAt
+            ).toISOString()
+          : new Date().toISOString();
+
+      await recordPaymentTransaction({
+        booking: crmBooking,
+        amount: amountPaid,
+        paymentDate,
+        paymentMethod: "ONLINE",
+        paymentProvider: "PAYMONGO",
+        paymentReference: paymongoReference,
+        source: "ONLINE_PAYMENT",
+        notes:
+          "Online payment confirmed by the PayMongo webhook.",
+        idempotencyKey:
+          `paymongo:${checkoutSessionId}`,
+      });
+    }
 
     return response.status(200).json({
       received: true,

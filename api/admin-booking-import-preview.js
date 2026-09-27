@@ -14,6 +14,12 @@ const GOOGLE_APPS_SCRIPT_URL =
 const GOOGLE_APPS_SCRIPT_SECRET =
   process.env.GOOGLE_APPS_SCRIPT_SECRET;
 
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
+
 const INACTIVE_STATUS_WORDS = [
   "CANCELLED",
   "CANCELED",
@@ -328,6 +334,7 @@ async function fetchSheetRows() {
       await fetch(url, {
         method: "GET",
         cache: "no-store",
+        headers: APPS_SCRIPT_REQUEST_HEADERS,
       }),
       "The booking spreadsheet could not be read."
     );
@@ -441,6 +448,8 @@ async function fetchCalendarEvents(rows) {
         await fetch(url, {
           method: "GET",
           cache: "no-store",
+          headers:
+            APPS_SCRIPT_REQUEST_HEADERS,
         }),
         "Google Calendar could not be checked."
       );

@@ -539,8 +539,27 @@ function CalendarTab({
     const statusByBookingId = new Map();
     let synced = 0;
     let needsAttention = 0;
+    let noCalendarRequired = 0;
 
     monthBookings.forEach((booking) => {
+      if (
+        String(
+          booking.calendar_status || ""
+        ).toUpperCase() ===
+        "NOT_REQUIRED"
+      ) {
+        statusByBookingId.set(
+          booking.id,
+          {
+            code: "historical",
+            label:
+              "Historical — no calendar event",
+          }
+        );
+        noCalendarRequired += 1;
+        return;
+      }
+
       const calendarEventId =
         normalizeEventId(
           booking.calendar_event_id
@@ -622,8 +641,12 @@ function CalendarTab({
     return {
       synced,
       needsAttention,
+      noCalendarRequired,
       googleOnly,
       total: monthBookings.length,
+      calendarTotal:
+        monthBookings.length -
+        noCalendarRequired,
       statusByBookingId,
     };
   }, [calendarEvents, monthBookings]);
@@ -802,7 +825,7 @@ function CalendarTab({
           <span>
             {syncError
               ? syncError
-              : `${syncOverview.synced} of ${syncOverview.total} CRM bookings synced · ${syncOverview.googleOnly} Google-only blocks`}
+              : `${syncOverview.synced} of ${syncOverview.calendarTotal} calendar bookings synced · ${syncOverview.noCalendarRequired} historical records · ${syncOverview.googleOnly} Google-only blocks`}
           </span>
         </div>
 

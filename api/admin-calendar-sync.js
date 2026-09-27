@@ -8,6 +8,12 @@ const GOOGLE_APPS_SCRIPT_URL =
 const GOOGLE_APPS_SCRIPT_SECRET =
   process.env.GOOGLE_APPS_SCRIPT_SECRET;
 
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
+
 function sendJson(response, status, data) {
   return response.status(status).json(data);
 }
@@ -86,6 +92,7 @@ export default async function handler(
       {
         method: "GET",
         cache: "no-store",
+        headers: APPS_SCRIPT_REQUEST_HEADERS,
       }
     );
 

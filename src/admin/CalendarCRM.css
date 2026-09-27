@@ -749,6 +749,11 @@
   color: #8a5b17;
 }
 
+.crm-calendar-agenda-meta .is-sync-historical {
+  background: #f2eee8;
+  color: #6d6257;
+}
+
 .crm-calendar-view-bookings {
   width: 100%;
 }

@@ -3,6 +3,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const APPS_SCRIPT_REQUEST_HEADERS = {
+  Accept: "application/json,text/plain,*/*",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+};
+
 const NON_BLOCKING_BOOKING_STATUSES = new Set([
   "CANCELLED",
   "CANCELED",
@@ -100,7 +106,13 @@ export default async function handler(request, response) {
         );
 
         const calendarResponse = await fetch(
-          url.toString()
+          url.toString(),
+          {
+            headers:
+              APPS_SCRIPT_REQUEST_HEADERS,
+            signal:
+              AbortSignal.timeout(8000),
+          }
         );
 
         const calendarText =

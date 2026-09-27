@@ -8,6 +8,7 @@ import {
   Tags,
   Workflow,
   BarChart3,
+  Landmark,
   Package,
   BadgePercent,
   CalendarX2,
@@ -38,7 +39,7 @@ const NAVIGATION_GROUPS = [
       {
         label: "Customers",
         icon: Users,
-        enabled: false,
+        enabled: true,
       },
       {
         label: "Leads",
@@ -93,7 +94,12 @@ const NAVIGATION_GROUPS = [
       {
         label: "Revenue",
         icon: CreditCard,
-        enabled: false,
+        enabled: true,
+      },
+      {
+        label: "Tax / BIR",
+        icon: Landmark,
+        enabled: true,
       },
     ],
   },
