@@ -534,8 +534,8 @@ const selectedPackagePrice =
       setValidatedDiscount(null);
       setDiscountMessage("");
 
-      const response = await fetch("/api/validate-discount", {
-        method: "POST",
+const response = await fetch("/api/create-booking-request?action=validate_discount", {
+          method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
