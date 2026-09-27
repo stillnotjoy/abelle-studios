@@ -1,3 +1,5 @@
+import { createClient } from "@supabase/supabase-js";
+
 const GOOGLE_APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
 const GOOGLE_APPS_SCRIPT_SECRET = process.env.GOOGLE_APPS_SCRIPT_SECRET;
 
@@ -6,6 +8,27 @@ const APPS_SCRIPT_REQUEST_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
 };
+
+function getSupabaseClient() {
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.BASE_URL ||
+    process.env.URL;
+
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      `Missing Supabase env vars. Found URL: ${Boolean(
+        supabaseUrl
+      )}, Found service key: ${Boolean(serviceRoleKey)}`
+    );
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 function normalizePhone(value) {
   let digits = String(value || "").replace(/\D/g, "");
@@ -51,7 +74,9 @@ function normalizeMessage(rawMessage, index) {
         message.messageType ||
         message.smsType ||
         "outbound"
-    ).toLowerCase().includes("in")
+    )
+      .toLowerCase()
+      .includes("in")
       ? "inbound"
       : "outbound",
     status:
@@ -83,14 +108,17 @@ function getMessagesFromPayload(payload) {
   return [];
 }
 
-export default async function handler(request, response) {
-  if (request.method !== "GET") {
-    response.setHeader("Allow", "GET");
-    return response.status(405).json({
-      error: "Method not allowed.",
-    });
-  }
+function getExpectedSecret() {
+  return (
+    process.env.ABELLE_LOG_SECRET ||
+    process.env.PAYMONGO_WEBHOOK_SECRET ||
+    process.env.GOOGLE_APPS_SCRIPT_SECRET ||
+    process.env.WEBHOOK_SECRET ||
+    process.env.SECRET_KEY
+  );
+}
 
+async function handleConversationFetch(request, response) {
   if (!GOOGLE_APPS_SCRIPT_URL || !GOOGLE_APPS_SCRIPT_SECRET) {
     return response.status(500).json({
       error: "Apps Script connection is not configured.",
@@ -106,13 +134,12 @@ export default async function handler(request, response) {
     });
   }
 
-const appsScriptUrl = new URL(
-  "https://script.google.com/macros/s/AKfycbwbXNv2bygfxAxtLjMTzhcVIZYxyvvYVFI7wWlSRoOM9rC6oztoi-Yka3DKsNNJLnxYOA/exec"
-);  appsScriptUrl.searchParams.set("action", "philsms_history");
+  const appsScriptUrl = new URL(GOOGLE_APPS_SCRIPT_URL);
+  appsScriptUrl.searchParams.set("action", "philsms_history");
   appsScriptUrl.searchParams.set("secret", GOOGLE_APPS_SCRIPT_SECRET);
   appsScriptUrl.searchParams.set("phone", phone);
 
-console.log("Apps Script URL being called:", appsScriptUrl.toString());
+  console.log("Apps Script URL being called:", appsScriptUrl.toString());
 
   try {
     const appsScriptResponse = await fetch(appsScriptUrl.toString(), {
@@ -123,6 +150,7 @@ console.log("Apps Script URL being called:", appsScriptUrl.toString());
     const text = await appsScriptResponse.text();
 
     let payload = {};
+
     try {
       payload = text ? JSON.parse(text) : {};
     } catch {
@@ -142,22 +170,22 @@ console.log("Apps Script URL being called:", appsScriptUrl.toString());
 
     const rawMessages = getMessagesFromPayload(payload);
 
-console.log("Apps Script payload:", JSON.stringify(payload).slice(0, 3000));
-console.log("Raw messages count:", rawMessages.length);
-console.log("Raw messages sample:", JSON.stringify(rawMessages[0] || null));
+    console.log("Apps Script payload:", JSON.stringify(payload).slice(0, 3000));
+    console.log("Raw messages count:", rawMessages.length);
+    console.log("Raw messages sample:", JSON.stringify(rawMessages[0] || null));
 
     const messages = rawMessages
-  .map(normalizeMessage)
-  .sort((a, b) => {
-    const first = new Date(a.date).getTime();
-    const second = new Date(b.date).getTime();
+      .map(normalizeMessage)
+      .sort((a, b) => {
+        const first = new Date(a.date).getTime();
+        const second = new Date(b.date).getTime();
 
-    if (Number.isNaN(first) || Number.isNaN(second)) {
-      return 0;
-    }
+        if (Number.isNaN(first) || Number.isNaN(second)) {
+          return 0;
+        }
 
-    return first - second;
-  });
+        return first - second;
+      });
 
     return response.status(200).json({
       ok: true,
@@ -170,4 +198,141 @@ console.log("Raw messages sample:", JSON.stringify(rawMessages[0] || null));
       error: "Could not contact Apps Script for SMS history.",
     });
   }
+}
+
+async function handleCustomerEventLog(request, response) {
+  let supabase;
+
+  try {
+    supabase = getSupabaseClient();
+  } catch (error) {
+    console.error(error.message);
+
+    return response.status(500).json({
+      error: error.message,
+    });
+  }
+
+  const secret = request.headers["x-abelle-log-secret"];
+  const expectedSecret = getExpectedSecret();
+
+  if (!expectedSecret) {
+    return response.status(500).json({
+      error: "Missing log secret.",
+    });
+  }
+
+  if (secret !== expectedSecret) {
+    return response.status(401).json({
+      error: "Unauthorized.",
+    });
+  }
+
+  let payload = request.body || {};
+
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch (error) {
+      return response.status(400).json({
+        error: "Invalid JSON body.",
+        details: error.message,
+      });
+    }
+  }
+
+  const normalizedPhone = normalizePhone(payload.customerPhone);
+
+  if (payload.kind === "conversation") {
+    const { error } = await supabase
+      .from("customer_conversations")
+      .insert({
+        customer_name: payload.customerName || null,
+        customer_phone: payload.customerPhone || null,
+        normalized_phone: normalizedPhone || null,
+        customer_email: payload.customerEmail || null,
+
+        type: payload.type || "email",
+        direction: payload.direction || "outbound",
+        status: payload.status || "sent",
+
+        subject: payload.subject || null,
+        message: payload.message || null,
+
+        provider: payload.provider || "apps_script",
+        provider_uid: payload.providerUid || null,
+
+        booking_reference: payload.bookingReference || null,
+        raw_response: payload.rawResponse || payload,
+      });
+
+    if (error) {
+      console.error("Conversation log failed:", error);
+
+      return response.status(500).json({
+        error: "Conversation log failed.",
+        details: error.message,
+      });
+    }
+
+    return response.status(200).json({
+      ok: true,
+    });
+  }
+
+  if (payload.kind === "activity") {
+    const { error } = await supabase
+      .from("customer_activity_logs")
+      .insert({
+        customer_name: payload.customerName || null,
+        customer_phone: payload.customerPhone || null,
+        normalized_phone: normalizedPhone || null,
+        customer_email: payload.customerEmail || null,
+
+        booking_reference: payload.bookingReference || null,
+
+        activity_type: payload.activityType || "system_event",
+        title: payload.title || "Customer activity",
+        description: payload.description || null,
+
+        old_value: payload.oldValue || null,
+        new_value: payload.newValue || null,
+
+        created_by: payload.createdBy || "system",
+        raw_data: payload.rawData || payload,
+      });
+
+    if (error) {
+      console.error("Activity log failed:", error);
+
+      return response.status(500).json({
+        error: "Activity log failed.",
+        details: error.message,
+      });
+    }
+
+    return response.status(200).json({
+      ok: true,
+    });
+  }
+
+  return response.status(400).json({
+    error: "Invalid log kind.",
+  });
+}
+
+export default async function handler(request, response) {
+  if (request.method === "GET") {
+    return handleConversationFetch(request, response);
+  }
+
+  if (request.method === "POST") {
+    return handleCustomerEventLog(request, response);
+  }
+
+  response.setHeader("Allow", "GET, POST");
+
+  return response.status(405).json({
+    error: "Method not allowed.",
+  });
 }
