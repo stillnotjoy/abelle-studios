@@ -393,6 +393,22 @@ function PostProductionTab() {
       }
     };
 
+  const sendViewingReady = async (booking) => {
+    if (!window.confirm(`Confirm editing is finished and ALL final photos are uploaded for ${booking.client_name}.\n\nThis grants editor access to ${booking.email || "the booking email"}, sends the viewing email and texts ${booking.phone || "the booking phone"}. Free storage/downloads last 30 days; extensions cost ₱99/month by arrangement.`)) return;
+    try {
+      setWorkingBookingId(booking.id);
+      const response = await adminFetch("/api/admin-manual-bookings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "notify_viewing_ready", id: booking.id, uploadsConfirmed: true }),
+      });
+      const result = await readJsonResponse(response);
+      if (!response.ok) throw new Error(result.error || "Could not send the viewing notification.");
+      if (result.booking) replaceBooking(result.booking);
+      alert(result.message);
+    } catch (sendError) { alert(sendError.message); }
+    finally { setWorkingBookingId(null); }
+  };
+
   const createClientFolder =
     async (booking) => {
       if (booking.client_drive_folder_url) {
@@ -822,9 +838,16 @@ function PostProductionTab() {
                       {status ===
                         "READY_FOR_DELIVERY" && (
                         <div className="crm-production-stage-actions">
+                          <button type="button" className="crm-production-primary-action"
+                            onClick={() => sendViewingReady(booking)}
+                            disabled={isWorking || !booking.email || !booking.phone || !booking.client_drive_folder_url}
+                            title="Send the photo folder email and SMS after all uploads are complete">
+                            <Send size={14} />
+                            {isWorking ? "Sending..." : "Notify Client"}
+                          </button>
                           <button
                             type="button"
-                            className="crm-production-primary-action"
+                            className="crm-production-quiet-action"
                             onClick={() =>
                               updatePostProduction(
                                 booking,
@@ -835,9 +858,10 @@ function PostProductionTab() {
                             disabled={isWorking}
                           >
                             <Send size={14} />
-                            {isWorking
-                              ? "Updating..."
-                              : "Mark Delivered"}
+                            <span>
+                              {isWorking ? "Updating..." : "Mark Delivered"}
+                              <small>No email or text</small>
+                            </span>
                           </button>
 
                           <button

@@ -1,4 +1,7 @@
+/* global process */
+
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "../server/adminAuth.js";
 
 const GOOGLE_APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
 const GOOGLE_APPS_SCRIPT_SECRET = process.env.GOOGLE_APPS_SCRIPT_SECRET;
@@ -50,6 +53,7 @@ function normalizeMessage(rawMessage, index) {
   return {
     id:
       message.id ||
+      message.uid ||
       message.messageId ||
       message.reference ||
       message.ref ||
@@ -148,19 +152,6 @@ function normalizeActivity(row, index) {
   };
 }
 
-function sortByDateAscending(items) {
-  return [...items].sort((a, b) => {
-    const first = new Date(a.date).getTime();
-    const second = new Date(b.date).getTime();
-
-    if (Number.isNaN(first) || Number.isNaN(second)) {
-      return 0;
-    }
-
-    return first - second;
-  });
-}
-
 function sortByDateDescending(items) {
   return [...items].sort((a, b) => {
     const first = new Date(a.date).getTime();
@@ -174,14 +165,7 @@ function sortByDateDescending(items) {
   });
 }
 
-
 async function handleConversationFetch(request, response) {
-  if (!GOOGLE_APPS_SCRIPT_URL || !GOOGLE_APPS_SCRIPT_SECRET) {
-    return response.status(500).json({
-      error: "Apps Script connection is not configured.",
-    });
-  }
-
   const phone = String(request.query.phone || "").trim();
   const email = String(request.query.email || "").trim().toLowerCase();
   const normalizedPhone = normalizePhone(phone);
@@ -193,47 +177,56 @@ async function handleConversationFetch(request, response) {
   }
 
   let smsMessages = [];
-  let supabaseMessages = [];
-  let activities = [];
+  let supabaseMessages;
+  let activities;
+
+  let smsWarning = "";
 
   try {
-    const appsScriptUrl = new URL(GOOGLE_APPS_SCRIPT_URL);
-    appsScriptUrl.searchParams.set("action", "philsms_history");
-    appsScriptUrl.searchParams.set("secret", GOOGLE_APPS_SCRIPT_SECRET);
-    appsScriptUrl.searchParams.set("phone", phone);
+    if (phone && GOOGLE_APPS_SCRIPT_URL && GOOGLE_APPS_SCRIPT_SECRET) {
+      const appsScriptUrl = new URL(GOOGLE_APPS_SCRIPT_URL);
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 4);
 
-    console.log("Apps Script URL being called:", appsScriptUrl.toString());
+      const startDateText = String(request.query.start_date || "").trim() ||
+        startDate.toISOString().slice(0, 10);
+      const endDateText = String(request.query.end_date || "").trim() ||
+        endDate.toISOString().slice(0, 10);
 
-    const appsScriptResponse = await fetch(appsScriptUrl.toString(), {
-      method: "GET",
-      headers: APPS_SCRIPT_REQUEST_HEADERS,
-    });
+      appsScriptUrl.searchParams.set("action", "philsms_history");
+      appsScriptUrl.searchParams.set("secret", GOOGLE_APPS_SCRIPT_SECRET);
+      appsScriptUrl.searchParams.set("phone", phone);
+      appsScriptUrl.searchParams.set("start_date", startDateText);
+      appsScriptUrl.searchParams.set("end_date", endDateText);
+      appsScriptUrl.searchParams.set("date", endDateText);
 
-    const text = await appsScriptResponse.text();
+      const appsScriptResponse = await fetch(appsScriptUrl.toString(), {
+        method: "GET",
+        headers: APPS_SCRIPT_REQUEST_HEADERS,
+        signal: AbortSignal.timeout(20000),
+      });
+      const payload = await appsScriptResponse.json();
 
-    let payload = {};
-
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = {
-        error: text,
-      };
-    }
-
-    if (!appsScriptResponse.ok || payload?.ok === false) {
-      console.warn("Could not load PhilSMS conversation history:", payload);
-    } else {
-      const rawMessages = getMessagesFromPayload(payload);
-
-      smsMessages = rawMessages.map((message, index) => ({
-        ...normalizeMessage(message, index),
-        type: "sms",
-        provider: "philsms",
-      }));
+      if (!appsScriptResponse.ok || payload?.ok === false) {
+        smsWarning = String(payload?.error || "").toLowerCase() === "unauthorized"
+          ? "SMS history could not load because the Google connection credentials were rejected. Saved conversations are shown below."
+          : "SMS history is temporarily unavailable. Saved conversations are shown below.";
+      } else {
+        smsWarning = String(payload.warning || "");
+        smsMessages = getMessagesFromPayload(payload).map((message, index) => ({
+          ...normalizeMessage(message, index),
+          type: "sms",
+          provider: "philsms",
+        }));
+      }
+    } else if (phone) {
+      smsWarning = "SMS history is not configured. Saved conversations are shown below.";
     }
   } catch (error) {
-    console.warn("PhilSMS history fetch failed:", error);
+    smsWarning = error.name === "AbortError" || error.name === "TimeoutError"
+      ? "SMS history timed out. Saved conversations are shown below."
+      : "SMS history is temporarily unavailable. Saved conversations are shown below.";
   }
 
   try {
@@ -242,7 +235,7 @@ async function handleConversationFetch(request, response) {
     let conversationQuery = supabase
       .from("customer_conversations")
       .select("*")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(100);
 
     if (normalizedPhone && email) {
@@ -262,7 +255,9 @@ async function handleConversationFetch(request, response) {
       throw conversationError;
     }
 
-    supabaseMessages = (conversationRows || []).map(normalizeSupabaseConversation);
+    supabaseMessages = (conversationRows || []).map(
+      normalizeSupabaseConversation
+    );
 
     let activityQuery = supabase
       .from("customer_activity_logs")
@@ -296,7 +291,7 @@ async function handleConversationFetch(request, response) {
     });
   }
 
-  const messages = sortByDateAscending([
+  const messages = sortByDateDescending([
     ...smsMessages,
     ...supabaseMessages,
   ]);
@@ -304,6 +299,7 @@ async function handleConversationFetch(request, response) {
   return response.status(200).json({
     ok: true,
     messages,
+    warning: smsWarning,
     activities: sortByDateDescending(activities),
   });
 }
@@ -431,6 +427,7 @@ async function handleCustomerEventLog(request, response) {
 
 export default async function handler(request, response) {
   if (request.method === "GET") {
+    if (!(await requireAdmin(request, response))) return;
     return handleConversationFetch(request, response);
   }
 

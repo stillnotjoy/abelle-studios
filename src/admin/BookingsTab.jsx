@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { adminFetch } from "./adminApi";
+import { isConfirmablePublicBooking } from "../../lib/booking-confirmation.js";
 import "./BookingsCRM.css";
 
 const MANUAL_BOOKING_SLOTS = [
@@ -77,29 +78,6 @@ function getTodayInputValue() {
   return localDate
     .toISOString()
     .slice(0, 10);
-}
-
-function isUpcomingBooking(booking) {
-  const shootDate = String(
-    booking?.shoot_date || ""
-  );
-
-  const shootTime = String(
-    booking?.shoot_time || ""
-  );
-
-  const scheduledAt = new Date(
-    `${shootDate}T${shootTime}:00+08:00`
-  );
-
-  return (
-    booking?.shoot_status !==
-      "COMPLETED" &&
-    !Number.isNaN(
-      scheduledAt.getTime()
-    ) &&
-    scheduledAt.getTime() > Date.now()
-  );
 }
 
 function readBookingExtras(
@@ -356,6 +334,11 @@ function BookingsTab({
   ] = useState(null);
 
   const [
+    confirmingBookingId,
+    setConfirmingBookingId,
+  ] = useState(null);
+
+  const [
     bookedTimes,
     setBookedTimes,
   ] = useState([]);
@@ -381,6 +364,10 @@ function BookingsTab({
     editingBooking
       ? packages
       : activePackages;
+
+  const shouldCheckSlots = !form.isHistoricalBooking && !(
+    editingBooking && form.shootDate < getTodayInputValue()
+  );
 
   const bookingStats = useMemo(
     () => ({
@@ -682,10 +669,11 @@ function BookingsTab({
     if (
       !showForm ||
       !form.shootDate ||
-      form.isHistoricalBooking
+      !shouldCheckSlots
     ) {
       setBookedTimes([]);
       setSlotError("");
+      setIsCheckingSlots(false);
       return;
     }
 
@@ -752,6 +740,7 @@ function BookingsTab({
     form.isHistoricalBooking,
     form.shootDate,
     showForm,
+    shouldCheckSlots,
   ]);
 
   useEffect(() => {
@@ -1014,13 +1003,6 @@ function BookingsTab({
   const openEditBooking = (
     booking
   ) => {
-    if (!isUpcomingBooking(booking)) {
-      alert(
-        "Only bookings whose shoot time is still in the future can be edited."
-      );
-      return;
-    }
-
     const packageTitle = String(
       booking.package_title || ""
     );
@@ -1058,6 +1040,7 @@ function BookingsTab({
 
     setForm({
       ...EMPTY_FORM,
+      isHistoricalBooking: booking.calendar_status === "NOT_REQUIRED",
       clientName:
         booking.client_name || "",
       email: booking.email || "",
@@ -1154,8 +1137,13 @@ function BookingsTab({
         return;
       }
 
+      if (form.email.trim() && !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(form.email.trim())) {
+        alert("Enter a valid client email address, for example name@gmail.com.");
+        return;
+      }
+
       if (
-        !form.isHistoricalBooking &&
+        shouldCheckSlots &&
         bookedTimes.includes(
           form.shootTime
         ) &&
@@ -1289,11 +1277,11 @@ function BookingsTab({
         await loadBookings();
 
         alert(
-          editingBooking
+          data.message || (editingBooking
             ? "Booking updated successfully."
             : form.isHistoricalBooking
               ? "Historical booking saved without staff or client notifications."
-            : "Manual booking saved successfully."
+            : "Manual booking saved successfully.")
         );
       } catch (error) {
         console.error(
@@ -1495,6 +1483,85 @@ function BookingsTab({
         alert(error.message);
       } finally {
         setMarkingShootCompleteId(
+          null
+        );
+      }
+    };
+
+  const confirmBooking =
+    async (booking) => {
+      if (!booking?.id) {
+        alert(
+          "This booking does not have a valid ID."
+        );
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          `Have you verified the customer's GCash payment for "${booking.client_name}"?\n\nThis will confirm the booking and send the customer's confirmation email and SMS.`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setConfirmingBookingId(
+          booking.id
+        );
+
+        const response = await adminFetch(
+          "/api/admin-manual-bookings",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              action: "confirm_booking",
+              id: booking.id,
+            }),
+          }
+        );
+
+        const data =
+          await readJsonResponse(
+            response
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Could not confirm this booking."
+          );
+        }
+
+        if (data.booking) {
+          setBookings((current) =>
+            current.map((item) =>
+              item.id === booking.id
+                ? data.booking
+                : item
+            )
+          );
+        } else {
+          await loadBookings();
+        }
+
+        alert(
+          data.message ||
+            "Booking confirmed successfully."
+        );
+      } catch (error) {
+        console.error(
+          "Booking confirmation failed:",
+          error
+        );
+        alert(error.message);
+      } finally {
+        setConfirmingBookingId(
           null
         );
       }
@@ -2029,8 +2096,33 @@ function BookingsTab({
                         Actions
                       </span>
 
-                                           <div className="crm-booking-actions">
-  {isUpcomingBooking(booking) && (
+                      <div className="crm-booking-actions">
+                        {isConfirmablePublicBooking(
+                          booking
+                        ) && (
+                          <button
+                            type="button"
+                            className="crm-booking-action is-confirm"
+                            onClick={() =>
+                              confirmBooking(
+                                booking
+                              )
+                            }
+                            disabled={
+                              confirmingBookingId ===
+                              booking.id
+                            }
+                          >
+                            <CheckCircle2
+                              size={14}
+                            />
+                            {confirmingBookingId ===
+                            booking.id
+                              ? "Confirming..."
+                              : "Confirm Booking"}
+                          </button>
+                        )}
+
     <button
       type="button"
       className="crm-booking-action is-payment"
@@ -2041,7 +2133,6 @@ function BookingsTab({
       <Pencil size={14} />
       Edit Booking
     </button>
-  )}
 
   {booking.shoot_status === "COMPLETED" ? (
     <span className="crm-booking-paid-label">
@@ -2197,7 +2288,7 @@ function BookingsTab({
 
             <p className="admin-drawer-intro">
               {editingBooking
-                ? "Update the client, package, extras, schedule and notes. Payments already received are preserved."
+                ? "Changes are internal only. No client emails or texts will be sent, and Google Calendar/Sheets will not be changed. Payments already received are preserved."
                 : form.isHistoricalBooking
                   ? "Add a past booking directly to the CRM and revenue reports. No staff or client notifications will be sent, and no Google Calendar event will be created."
                 : "Add the client, package, schedule and payment details."}
@@ -2573,7 +2664,7 @@ function BookingsTab({
                     }
                     disabled={
                       !form.shootDate ||
-                      (!form.isHistoricalBooking &&
+                      (shouldCheckSlots &&
                         (isCheckingSlots ||
                           Boolean(slotError)))
                     }
@@ -2592,7 +2683,7 @@ function BookingsTab({
                     {MANUAL_BOOKING_SLOTS.map(
                       (slot) => {
                         const isBooked =
-                          !form.isHistoricalBooking &&
+                          shouldCheckSlots &&
                           bookedTimes.includes(
                             slot.value
                           ) &&
@@ -2848,6 +2939,10 @@ function BookingsTab({
                 ×
               </button>
             </div>
+
+            <p className="admin-drawer-intro">
+              Records payment internally in the CRM and revenue reports. No client emails or texts will be sent, and Google Sheets will not be changed.
+            </p>
 
             <div className="crm-payment-client-card">
               <strong>

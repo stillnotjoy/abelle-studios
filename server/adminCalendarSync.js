@@ -1,6 +1,6 @@
 /* global process */
 
-import { requireAdmin } from "../server/adminAuth.js";
+import { requireAdmin } from "./adminAuth.js";
 
 const GOOGLE_APPS_SCRIPT_URL =
   process.env.GOOGLE_APPS_SCRIPT_URL;

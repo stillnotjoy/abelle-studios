@@ -3,8 +3,24 @@
   "regions": ["sin1"],
   "rewrites": [
     {
+      "source": "/api/admin-calendar-sync",
+      "destination": "/api/admin-tools?tool=calendar-sync"
+    },
+    {
+      "source": "/api/admin-booking-import-preview",
+      "destination": "/api/admin-tools?tool=booking-import-preview"
+    },
+    {
+      "source": "/api/admin-revenue-report",
+      "destination": "/api/admin-tools?tool=revenue-report"
+    },
+    {
       "source": "/api/packages",
       "destination": "/api/admin-packages?public=1"
+    },
+    {
+      "source": "/book",
+      "destination": "/index.html"
     },
     {
       "source": "/admin",

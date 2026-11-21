@@ -400,25 +400,32 @@
 }
 
 .crm-booking-actions {
+  min-width: 0;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .crm-booking-actions .crm-booking-action,
 .crm-booking-actions .crm-booking-paid-label {
-  min-height: 30px;
-  gap: 4px;
-  padding: 0 8px;
-  font-size: 8px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: 36px;
+  min-height: 36px;
+  gap: 6px;
+  padding: 0 11px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .crm-booking-actions .crm-booking-action svg,
 .crm-booking-actions .crm-booking-paid-label svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .crm-booking-action {
@@ -453,19 +460,29 @@
   background: #2b2723;
 }
 
+.crm-booking-action.is-confirm {
+  border: 1px solid #176b45;
+  background: #176b45;
+  color: #ffffff;
+}
+
+.crm-booking-action.is-confirm:hover:not(:disabled) {
+  background: #125638;
+}
+
 .crm-booking-actions
   .crm-booking-action.is-delete {
-  width: 28px;
-  min-width: 28px;
+  width: 36px;
+  min-width: 36px;
   padding: 0;
-  border: 0;
-  background: transparent;
+  border: 1px solid #f0dddd;
+  background: #fffafa;
   color: #ad2929;
 }
 
 .crm-booking-actions
   .crm-booking-action.is-delete:hover:not(:disabled) {
-  background: transparent;
+  background: #fceaea;
   color: #d11f1f;
 }
 
@@ -478,9 +495,11 @@
   min-height: 34px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 0 10px;
   border-radius: 8px;
+  border: 1px solid #dcebdd;
   background: #eef7f0;
   color: #34704a;
   font-size: 9px;

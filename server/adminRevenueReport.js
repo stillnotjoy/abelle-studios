@@ -1,6 +1,6 @@
 /* global process */
 
-import { requireAdmin } from "../server/adminAuth.js";
+import { requireAdmin } from "./adminAuth.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =

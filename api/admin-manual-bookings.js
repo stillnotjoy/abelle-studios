@@ -2,6 +2,8 @@
 
 import { requireAdmin } from "../server/adminAuth.js";
 import { recordPaymentTransaction } from "../server/paymentLedger.js";
+import { isConfirmablePublicBooking } from "../lib/booking-confirmation.js";
+import handleViewingReady from "../server/viewingReadyHandler.js";
 import {
   buildCustomerDirectory,
   normalizeCustomerPhone,
@@ -357,7 +359,9 @@ async function getManualBookingById(
           "payment_provider",
           "payment_reference",
           "payment_option",
+          "booking_source",
           "calendar_event_id",
+          "calendar_status",
           "client_drive_folder_id",
           "client_drive_folder_url",
           "client_drive_folder_name",
@@ -525,222 +529,6 @@ async function createManualBookingInCalendar(
   }
 
   return data;
-}
-
-async function recordManualBookingPaymentExternally(
-  paymentUpdate
-) {
-  const appsScriptUrl =
-    process.env.GOOGLE_APPS_SCRIPT_URL;
-
-  const appsScriptSecret =
-    process.env.GOOGLE_APPS_SCRIPT_SECRET;
-
-  if (
-    !appsScriptUrl ||
-    !appsScriptSecret
-  ) {
-    throw new Error(
-      "Missing Google Apps Script environment variables."
-    );
-  }
-
-  const response = await fetch(
-    appsScriptUrl,
-    {
-      method: "POST",
-
-      headers: {
-        ...APPS_SCRIPT_REQUEST_HEADERS,
-        "Content-Type":
-          "application/json",
-      },
-
-      body: JSON.stringify({
-        secret: appsScriptSecret,
-        action:
-          "record_manual_booking_payment",
-
-        bookingReference:
-          paymentUpdate.bookingReference,
-
-        paymentStatus:
-          paymentUpdate.paymentStatus,
-
-        amountPaid:
-          paymentUpdate.amountPaid,
-
-        remainingBalance:
-          paymentUpdate.remainingBalance,
-
-        amountReceived:
-          paymentUpdate.amountReceived,
-
-        paymentMethod:
-          paymentUpdate.paymentMethod,
-
-        paymentReference:
-          paymentUpdate.paymentReference,
-
-        paymentDate:
-          paymentUpdate.paymentDate,
-
-        paymentNotes:
-          paymentUpdate.paymentNotes,
-      }),
-    }
-  );
-
-  const responseText =
-    await response.text();
-
-  let data = null;
-
-  try {
-    data = responseText
-      ? JSON.parse(responseText)
-      : null;
-  } catch {
-    console.error(
-      "Apps Script payment update returned non-JSON:",
-      responseText
-    );
-
-    throw new Error(
-      "Could not read the Google Sheet payment update response."
-    );
-  }
-
-  if (
-    !response.ok ||
-    !data?.ok
-  ) {
-    console.error(
-      "Apps Script payment update failed:",
-      data
-    );
-
-    throw new Error(
-      data?.error ||
-        "Could not update the linked Google Sheet payment record."
-    );
-  }
-
-  return data;
-}
-
-async function updateManualBookingExternally(
-  manualBooking
-) {
-  const appsScriptUrl =
-    process.env.GOOGLE_APPS_SCRIPT_URL;
-
-  const appsScriptSecret =
-    process.env.GOOGLE_APPS_SCRIPT_SECRET;
-
-  if (
-    !appsScriptUrl ||
-    !appsScriptSecret
-  ) {
-    throw new Error(
-      "Missing Google Apps Script environment variables."
-    );
-  }
-
-  const response = await fetch(
-    appsScriptUrl,
-    {
-      method: "POST",
-      headers: {
-        ...APPS_SCRIPT_REQUEST_HEADERS,
-        "Content-Type":
-          "application/json",
-      },
-      body: JSON.stringify({
-        secret: appsScriptSecret,
-        action:
-          "update_manual_booking",
-        bookingReference:
-          manualBooking.booking_reference,
-        calendarEventId:
-          manualBooking.calendar_event_id ||
-          "",
-        name:
-          manualBooking.client_name,
-        email: manualBooking.email,
-        phone: manualBooking.phone,
-        packageTitle:
-          manualBooking.package_title,
-        packagePrice:
-          manualBooking.package_price,
-        durationMinutes:
-          manualBooking.duration_minutes,
-        date:
-          manualBooking.shoot_date,
-        time:
-          manualBooking.shoot_time,
-        paymentStatus:
-          manualBooking.payment_status,
-        amountPaid:
-          manualBooking.amount_paid,
-        remainingBalance:
-          manualBooking.remaining_balance,
-        paymentMethod:
-          manualBooking.payment_provider ||
-          "UNKNOWN",
-        paymentReference:
-          manualBooking.payment_reference ||
-          "",
-        notes:
-          manualBooking.notes || "",
-      }),
-    }
-  );
-
-  const responseText =
-    await response.text();
-
-  let data = null;
-
-  try {
-    data = responseText
-      ? JSON.parse(responseText)
-      : null;
-  } catch {
-    throw new Error(
-      "Could not read the booking update response from Google Calendar and Sheets."
-    );
-  }
-
-  if (!response.ok || !data?.ok) {
-    throw new Error(
-      data?.error ||
-        "Could not update Google Calendar and Sheets."
-    );
-  }
-
-  return data;
-}
-
-function isUpcomingManualBooking(
-  booking
-) {
-  const scheduledAt = new Date(
-    `${cleanText(
-      booking?.shoot_date
-    )}T${cleanText(
-      booking?.shoot_time
-    )}:00+08:00`
-  );
-
-  return (
-    booking?.shoot_status !==
-      "COMPLETED" &&
-    !Number.isNaN(
-      scheduledAt.getTime()
-    ) &&
-    scheduledAt.getTime() > Date.now()
-  );
 }
 
 async function createClientDriveFolderExternally(
@@ -917,8 +705,93 @@ async function deleteManualBookingRecords(
     );
 
     throw new Error(
-      data?.error ||
+      cleanText(data?.error).toLowerCase() === "unauthorized"
+        ? "Google Calendar and Sheets rejected the connection credentials. Check that GOOGLE_APPS_SCRIPT_URL points to the correct deployment and GOOGLE_APPS_SCRIPT_SECRET matches its configured secret. The booking was not deleted."
+        : data?.error ||
         "Could not delete the linked calendar and sheet records."
+    );
+  }
+
+  if (
+    data.bookingReference !== manualBooking.booking_reference ||
+    typeof data.calendarDeleted !== "boolean" ||
+    !Number.isInteger(data.sheetRowsDeleted) ||
+    data.sheetRowsDeleted < 0
+  ) {
+    throw new Error("Google did not return a valid deletion confirmation. The dashboard booking was kept. Refresh before trying again.");
+  }
+
+  return data;
+}
+
+async function confirmPendingBookingExternally(
+  booking
+) {
+  const appsScriptUrl =
+    process.env.GOOGLE_APPS_SCRIPT_URL;
+  const appsScriptSecret =
+    process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
+  if (!appsScriptUrl || !appsScriptSecret) {
+    throw new Error(
+      "Missing Google Apps Script environment variables."
+    );
+  }
+
+  const appsScriptResponse = await fetch(
+    appsScriptUrl,
+    {
+      method: "POST",
+      headers: {
+        ...APPS_SCRIPT_REQUEST_HEADERS,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        secret: appsScriptSecret,
+        action: "confirm_pending_booking",
+        bookingReference:
+          booking.booking_reference,
+      }),
+    }
+  );
+
+  const responseText =
+    await appsScriptResponse.text();
+  let data = null;
+
+  try {
+    data = responseText
+      ? JSON.parse(responseText)
+      : null;
+  } catch {
+    console.error(
+      "Apps Script confirmation returned non-JSON:",
+      responseText
+    );
+    throw new Error(
+      "Could not read the Apps Script confirmation response."
+    );
+  }
+
+  if (!appsScriptResponse.ok || !data?.ok) {
+    throw new Error(
+      cleanText(data?.error).toLowerCase() ===
+        "unauthorized"
+        ? "Google Calendar and Sheets rejected the connection credentials. Check the Apps Script deployment and secret before trying again."
+        : data?.error ||
+            "Could not confirm the linked Google booking."
+    );
+  }
+
+  if (
+    cleanText(data.bookingReference) !==
+      cleanText(booking.booking_reference) ||
+    cleanText(data.status).toUpperCase() !==
+      "PAID / CONFIRMED" ||
+    !cleanText(data.eventId)
+  ) {
+    throw new Error(
+      "Google did not return a valid booking confirmation. The CRM booking was not changed."
     );
   }
 
@@ -1061,6 +934,10 @@ export default async function handler(
   try {
     if (!(await requireAdmin(req, res))) {
       return;
+    }
+
+    if (req.method === "POST" && req.body?.action === "notify_viewing_ready") {
+      return handleViewingReady(req, res);
     }
 
     /*
@@ -1350,6 +1227,181 @@ export default async function handler(
             updatedBookings.length,
           message:
             "Customer information updated.",
+        });
+      }
+
+      if (
+        cleanText(body.action) ===
+        "confirm_booking"
+      ) {
+        const bookingId = cleanText(
+          body.id
+        );
+
+        if (!bookingId) {
+          return sendJson(res, 400, {
+            error:
+              "Booking ID is required.",
+          });
+        }
+
+        const booking =
+          await getManualBookingById(
+            bookingId
+          );
+
+        if (!booking) {
+          return sendJson(res, 404, {
+            error:
+              "Booking not found.",
+          });
+        }
+
+        if (
+          !isConfirmablePublicBooking(
+            booking
+          )
+        ) {
+          return sendJson(res, 409, {
+            error:
+              "Only pending website or standalone-form GCash bookings can be confirmed here.",
+          });
+        }
+
+        const confirmation =
+          await confirmPendingBookingExternally(
+            booking
+          );
+
+        const confirmedAmountPaid =
+          roundCurrency(
+            confirmation.amountPaid
+          );
+        const confirmedBalance =
+          roundCurrency(
+            confirmation.remainingBalance
+          );
+
+        if (
+          !Number.isFinite(
+            confirmedAmountPaid
+          ) ||
+          confirmedAmountPaid < 0 ||
+          !Number.isFinite(
+            confirmedBalance
+          ) ||
+          confirmedBalance < 0
+        ) {
+          return sendJson(res, 502, {
+            error:
+              "Google confirmed the booking, but returned invalid payment totals. Refresh before trying again.",
+          });
+        }
+
+        const encodedBookingId =
+          encodeURIComponent(bookingId);
+        const updated =
+          await supabaseRequest(
+            `manual_bookings?id=eq.${encodedBookingId}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                booking_status:
+                  "PAID / CONFIRMED",
+                payment_status:
+                  confirmedBalance <= 0
+                    ? "PAID"
+                    : "PARTIAL",
+                amount_paid:
+                  confirmedAmountPaid,
+                remaining_balance:
+                  confirmedBalance,
+                payment_provider:
+                  "GCASH",
+                calendar_event_id:
+                  confirmation.eventId,
+                calendar_status:
+                  "CREATED",
+              }),
+            }
+          );
+
+        if (!updated?.length) {
+          return sendJson(res, 502, {
+            error:
+              "Google confirmed the booking, but the CRM could not be updated. Refresh and try again; customer notifications will not be duplicated.",
+          });
+        }
+
+        const paymentDifference =
+          roundCurrency(
+            confirmedAmountPaid -
+              Number(
+                booking.amount_paid || 0
+              )
+          );
+        let ledgerWarning = "";
+        const notificationWarning =
+          cleanText(
+            confirmation.smsWarning
+          )
+            ? ` ${cleanText(
+                confirmation.smsWarning
+              )}`
+            : "";
+
+        if (paymentDifference > 0) {
+          try {
+            await recordPaymentTransaction({
+              booking: updated[0],
+              amount: paymentDifference,
+              paymentDate:
+                confirmation.confirmedAt ||
+                new Date().toISOString(),
+              paymentMethod: "GCASH",
+              paymentProvider: "GCASH",
+              paymentReference:
+                booking.payment_reference ||
+                "",
+              source: "ONLINE_PAYMENT",
+              notes:
+                "GCash deposit verified when the pending public booking was confirmed.",
+              idempotencyKey:
+                `gcash-confirmation:${booking.id}`,
+            });
+          } catch (ledgerError) {
+            console.error(
+              "Confirmed booking ledger entry failed:",
+              ledgerError
+            );
+            ledgerWarning =
+              " The booking is confirmed, but its revenue entry needs review.";
+          }
+        }
+
+        return sendJson(res, 200, {
+          success: true,
+          reused: Boolean(
+            confirmation.reused
+          ),
+          booking: updated[0],
+          google: {
+            sheetUpdated: true,
+            calendarUpdated: true,
+            emailSent: Boolean(
+              confirmation.emailSent
+            ),
+            smsSent: Boolean(
+              confirmation.smsSent
+            ),
+            remindersStopped: Boolean(
+              confirmation.remindersStopped
+            ),
+          },
+          message:
+            notificationWarning
+              ? `Booking confirmed. Calendar, Sheet, and email were updated.${notificationWarning}${ledgerWarning}`
+              : `Booking confirmed. Calendar, Sheet, email, and SMS were updated.${ledgerWarning}`,
         });
       }
 
@@ -1878,6 +1930,12 @@ export default async function handler(
 
       const phone =
         cleanText(body.phone);
+
+      if (email && !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email)) {
+        return sendJson(res, 400, {
+          error: "Enter a valid client email address, for example name@gmail.com. Nothing was created or sent.",
+        });
+      }
 
       const packageId =
         cleanText(body.packageId);
@@ -2466,7 +2524,12 @@ export default async function handler(
             isHistoricalBooking,
 
           notificationsSent:
-            !isHistoricalBooking,
+            !isHistoricalBooking && !calendarResult.notificationsSkipped,
+          notificationWarnings:
+            calendarResult.notificationWarnings || [],
+          message: calendarResult.notificationWarnings?.length
+            ? `Booking saved successfully. ${calendarResult.notificationWarnings.join(" ")} Do not recreate the booking; review notifications separately.`
+            : undefined,
         }
       );
     }
@@ -2504,17 +2567,6 @@ export default async function handler(
           return sendJson(res, 404, {
             error:
               "Manual booking not found.",
-          });
-        }
-
-        if (
-          !isUpcomingManualBooking(
-            manualBooking
-          )
-        ) {
-          return sendJson(res, 409, {
-            error:
-              "Only bookings whose shoot time is still in the future can be edited.",
           });
         }
 
@@ -2580,21 +2632,11 @@ export default async function handler(
           });
         }
 
-        const updatedSchedule = {
-          shoot_date: shootDate,
-          shoot_time: shootTime,
-          shoot_status:
-            manualBooking.shoot_status,
-        };
-
-        if (
-          !isUpcomingManualBooking(
-            updatedSchedule
-          )
-        ) {
+        const scheduledAt = getScheduledAt(shootDate, shootTime);
+        if (!scheduledAt || scheduledAt.toISOString().slice(0, 10) !== shootDate) {
           return sendJson(res, 400, {
             error:
-              "The updated shoot date and time must still be in the future.",
+              "The selected shoot date is invalid.",
           });
         }
 
@@ -2837,64 +2879,14 @@ export default async function handler(
           });
         }
 
-        try {
-          await updateManualBookingExternally(
-            {
-              ...manualBooking,
-              ...updatePayload,
-              duration_minutes:
-                durationMinutes,
-            }
-          );
-        } catch (externalError) {
-          try {
-            await supabaseRequest(
-              `manual_bookings?id=eq.${encodedBookingId}`,
-              {
-                method: "PATCH",
-                body: JSON.stringify({
-                  client_name:
-                    manualBooking.client_name,
-                  email:
-                    manualBooking.email,
-                  phone:
-                    manualBooking.phone,
-                  package_title:
-                    manualBooking.package_title,
-                  package_price:
-                    manualBooking.package_price,
-                  shoot_date:
-                    manualBooking.shoot_date,
-                  shoot_time:
-                    manualBooking.shoot_time,
-                  payment_status:
-                    manualBooking.payment_status,
-                  remaining_balance:
-                    manualBooking.remaining_balance,
-                  notes:
-                    manualBooking.notes,
-                }),
-              }
-            );
-          } catch (rollbackError) {
-            console.error(
-              "Booking edit rollback failed:",
-              rollbackError
-            );
-          }
-
-          throw new Error(
-            externalError.message ||
-              "The booking was not updated because Google Calendar and Sheets could not be synchronized.",
-            { cause: externalError }
-          );
-        }
-
+        // Corrections stay internal. A future date does not authorize client notifications.
         return sendJson(res, 200, {
           success: true,
           booking: updated[0],
-          message:
-            "Booking updated in the CRM, Google Calendar, and spreadsheet.",
+          internalOnly: true,
+          notificationsSent: false,
+          googleSynced: false,
+          message: "Booking updated internally. No client emails or texts were sent, and Google Calendar/Sheets were not changed.",
         });
       }
 
@@ -3102,101 +3094,7 @@ export default async function handler(
         );
       }
 
-      /*
-       * Update the matching Google Sheet row.
-       *
-       * If the Sheet update fails, restore
-       * the previous Supabase totals.
-       */
-      let externalResult;
-
-      if (
-        cleanText(
-          manualBooking.calendar_status
-        ).toUpperCase() !==
-        "NOT_REQUIRED"
-      ) {
-        try {
-          externalResult =
-            await recordManualBookingPaymentExternally(
-              {
-                bookingReference:
-                  manualBooking.booking_reference,
-
-                paymentStatus:
-                  newPaymentStatus,
-
-                amountPaid:
-                  newAmountPaid,
-
-                remainingBalance:
-                  newRemainingBalance,
-
-                amountReceived,
-
-                paymentMethod,
-
-                paymentReference,
-
-                paymentDate,
-
-                paymentNotes,
-              }
-            );
-        } catch (
-          externalError
-        ) {
-          console.error(
-            "Payment Sheet sync failed. Rolling back Supabase:",
-            externalError
-          );
-
-          try {
-            await supabaseRequest(
-              `manual_bookings?id=eq.${encodedBookingId}`,
-              {
-                method:
-                  "PATCH",
-
-                body:
-                  JSON.stringify({
-                    payment_status:
-                      manualBooking.payment_status,
-
-                    amount_paid:
-                      previousAmountPaid,
-
-                    remaining_balance:
-                      previousBalance,
-
-                    payment_provider:
-                      manualBooking.payment_provider,
-
-                    payment_reference:
-                      manualBooking.payment_reference,
-                  }),
-              }
-            );
-          } catch (
-            rollbackError
-          ) {
-            console.error(
-              "Payment rollback failed:",
-              rollbackError
-            );
-
-            throw new Error(
-              "The Google Sheet payment update failed, and the Supabase rollback also failed. Please check this booking manually."
-            );
-          }
-
-          throw new Error(
-            externalError.message ||
-              "The payment was not recorded because the Google Sheet could not be updated."
-          );
-        }
-      }
-
+      // Payment collection is internal: persist the revenue entry without Google or client messages.
       await recordPaymentTransaction({
         booking: {
           ...manualBooking,
@@ -3233,10 +3131,9 @@ export default async function handler(
             paymentNotes,
           },
 
-          sheetUpdated:
-            Boolean(
-              externalResult?.sheetUpdated
-            ),
+          sheetUpdated: false,
+          internalOnly: true,
+          notificationsSent: false,
 
           message:
             newPaymentStatus ===
