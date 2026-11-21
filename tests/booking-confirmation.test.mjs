@@ -76,6 +76,8 @@ function createAppsScriptHarness({
   status = "PENDING DP PAYMENT",
   bookingReference =
     "AB-O-S-261121-1234",
+  sheetBookingReference =
+    bookingReference,
 } = {}) {
   const source = readFileSync(
     new URL(
@@ -85,7 +87,7 @@ function createAppsScriptHarness({
     "utf8"
   );
   const row = Array(29).fill("");
-  row[1] = bookingReference;
+  row[1] = sheetBookingReference;
   row[2] = status;
   row[3] = "Test Client";
   row[4] = "client@example.test";
@@ -158,6 +160,9 @@ function createAppsScriptHarness({
     SHEET_NAME: "Bookings / Sales",
     COL_BOOKING_REFERENCE: 2,
     COL_STATUS: 3,
+    COL_EMAIL: 5,
+    COL_SHOOT_DATE: 8,
+    COL_SHOOT_TIME: 9,
     COL_PAID_ONLINE: 11,
     COL_REMAINING_BALANCE: 14,
     COL_CALENDAR_EVENT_ID: 18,
@@ -177,6 +182,10 @@ function createAppsScriptHarness({
       new Date(
         "2026-12-01T10:00:00+08:00"
       ),
+    formatSheetDate: (value) =>
+      String(value || ""),
+    formatSheetTime: (value) =>
+      String(value || "").slice(0, 5),
     confirmBookingFromSheet: () => {
       calls.confirm += 1;
       row[2] = "PAID / CONFIRMED";
@@ -201,6 +210,10 @@ function createAppsScriptHarness({
     run: () =>
       context.confirmPendingBookingFromApi({
         bookingReference,
+        calendarEventId: "event-hold",
+        email: "client@example.test",
+        shootDate: "2026-12-01",
+        shootTime: "10:00:00",
       }),
   };
 }
@@ -251,6 +264,27 @@ test("Apps Script adapter reuses a confirmed row without duplicate messages", ()
   assert.deepEqual(harness.calls, {
     confirm: 0,
     sms: 0,
+  });
+});
+
+test("Apps Script adapter repairs a mismatched legacy reference through the exact Calendar hold", () => {
+  const harness =
+    createAppsScriptHarness({
+      bookingReference:
+        "AB-O-S-261128-6910",
+      sheetBookingReference:
+        "AB-O-S-261128-4455",
+    });
+  const result = harness.run();
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    harness.row[1],
+    "AB-O-S-261128-6910"
+  );
+  assert.deepEqual(harness.calls, {
+    confirm: 1,
+    sms: 1,
   });
 });
 

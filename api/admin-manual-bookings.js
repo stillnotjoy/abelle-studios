@@ -751,6 +751,15 @@ async function confirmPendingBookingExternally(
         action: "confirm_pending_booking",
         bookingReference:
           booking.booking_reference,
+        calendarEventId:
+          booking.calendar_event_id || "",
+        clientName:
+          booking.client_name || "",
+        email: booking.email || "",
+        shootDate:
+          booking.shoot_date || "",
+        shootTime:
+          booking.shoot_time || "",
       }),
     }
   );

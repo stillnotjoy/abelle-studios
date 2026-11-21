@@ -16,6 +16,21 @@
  *
  * 5. Deploy a NEW VERSION of the existing Web App deployment.
  *
+ * IMPORTANT FUTURE-BOOKING FIX
+ * In the existing createPendingBooking(payload) function, replace its
+ * bookingReference assignment with:
+ *
+ *   const bookingReference = String(
+ *     payload.bookingReference || ""
+ *   ).trim() || buildBookingReference({
+ *     date: payload.date,
+ *     packageTitle: payload.packageTitle,
+ *     source: "O",
+ *   });
+ *
+ * This keeps the CRM, Sheet, and Calendar on one reference. The recovery
+ * logic below also repairs older pending rows by their Calendar event ID.
+ *
  * Do not create a second Apps Script project or a second Web App.
  * This adapter deliberately calls the existing
  * confirmBookingFromSheet(rowNumber) function, which remains responsible
@@ -118,23 +133,108 @@ function confirmPendingBookingFromApi(
     );
   }
 
-  const references = sheet
+  const bookingRows = sheet
     .getRange(
       2,
       COL_BOOKING_REFERENCE,
       lastRow - 1,
-      1
+      COL_CALENDAR_EVENT_ID -
+        COL_BOOKING_REFERENCE +
+        1
     )
     .getDisplayValues();
 
-  const referenceIndex =
-    references.findIndex(
+  let referenceIndex =
+    bookingRows.findIndex(
       function (row) {
         return String(
           row[0] || ""
         ).trim() === bookingReference;
       }
     );
+
+  if (referenceIndex < 0) {
+    const calendarEventId = String(
+      payload.calendarEventId || ""
+    ).trim();
+    const eventIdColumnOffset =
+      COL_CALENDAR_EVENT_ID -
+      COL_BOOKING_REFERENCE;
+
+    if (calendarEventId) {
+      referenceIndex =
+        bookingRows.findIndex(
+          function (row) {
+            return String(
+              row[eventIdColumnOffset] ||
+                ""
+            ).trim() === calendarEventId;
+          }
+        );
+    }
+
+    if (referenceIndex >= 0) {
+      const recoveryRow =
+        sheet
+          .getRange(
+            referenceIndex + 2,
+            1,
+            1,
+            COL_SMS_REMINDER_2H_SENT
+          )
+          .getValues()[0];
+      const sheetEmail = String(
+        recoveryRow[COL_EMAIL - 1] || ""
+      ).trim().toLowerCase();
+      const requestedEmail = String(
+        payload.email || ""
+      ).trim().toLowerCase();
+      const sheetDate = formatSheetDate(
+        recoveryRow[COL_SHOOT_DATE - 1]
+      );
+      const requestedDate = String(
+        payload.shootDate || ""
+      ).trim();
+      const sheetTime = formatSheetTime(
+        recoveryRow[COL_SHOOT_TIME - 1]
+      );
+      const requestedTimeText = String(
+        payload.shootTime || ""
+      ).trim();
+      const requestedTimeMatch =
+        requestedTimeText.match(
+          /^(\d{1,2}):(\d{2})/
+        );
+      const requestedTime =
+        requestedTimeMatch
+          ? String(
+              requestedTimeMatch[1]
+            ).padStart(2, "0") +
+            ":" +
+            requestedTimeMatch[2]
+          : requestedTimeText;
+
+      if (
+        (requestedEmail &&
+          sheetEmail !== requestedEmail) ||
+        (requestedDate &&
+          sheetDate !== requestedDate) ||
+        (requestedTime &&
+          sheetTime !== requestedTime)
+      ) {
+        throw new Error(
+          "The Calendar hold matched a different spreadsheet booking. Nothing was changed."
+        );
+      }
+
+      sheet
+        .getRange(
+          referenceIndex + 2,
+          COL_BOOKING_REFERENCE
+        )
+        .setValue(bookingReference);
+    }
+  }
 
   if (referenceIndex < 0) {
     throw new Error(
