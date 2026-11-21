@@ -139,8 +139,46 @@ function getDefaultPackageImage(packageName) {
   return "/assets/personal.jpg";
 }
 
+function getHighResolutionPackageImage(
+  imageUrl
+) {
+  const value = String(
+    imageUrl || ""
+  ).trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (
+      url.hostname ===
+        "drive.google.com" &&
+      url.pathname === "/thumbnail"
+    ) {
+      url.searchParams.set(
+        "sz",
+        "w1600"
+      );
+
+      return url.toString();
+    }
+  } catch {
+    // Local assets such as /assets/family.jpg
+    // are already served at their original size.
+  }
+
+  return value;
+}
+
 function mapPublicPackage(pkg, index) {
   const duration = Number(pkg.duration_minutes || 0);
+  const packageImage =
+    getHighResolutionPackageImage(
+      pkg.image_url
+    );
 
   return {
     id: String(pkg.id),
@@ -151,7 +189,7 @@ function mapPublicPackage(pkg, index) {
       : "Studio Session",
     desc: pkg.description || "",
     image:
-      pkg.image_url ||
+      packageImage ||
       getDefaultPackageImage(pkg.name),
 imagePosition: getPackageImagePosition(pkg.name),
 price: formatPackagePrice(pkg.default_price),
