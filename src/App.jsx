@@ -1031,13 +1031,22 @@ const response = await fetch("/api/create-booking-request?action=validate_discou
   <img
     src={pkg.image}
     alt={`${pkg.title} sample`}
+    style={{
+      objectPosition:
+        pkg.imagePosition,
+    }}
     onLoad={(event) => {
       const image = event.currentTarget;
       const imageBox = image.closest(".package-media");
 
       if (!imageBox) return;
 
+      const isSoloPackage =
+        String(pkg.title || "")
+          .toLowerCase()
+          .includes("solo");
       const isPortrait =
+        isSoloPackage ||
         image.naturalHeight > image.naturalWidth;
 
       imageBox.classList.toggle(
