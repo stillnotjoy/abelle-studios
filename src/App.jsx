@@ -127,6 +127,18 @@ function getPackageImagePosition(packageName) {
   return "center 35%";
 }
 
+function getDefaultPackageImage(packageName) {
+  const name = String(
+    packageName || ""
+  ).toLowerCase();
+
+  if (name.includes("event")) {
+    return "/assets/events-wedding.webp";
+  }
+
+  return "/assets/personal.jpg";
+}
+
 function mapPublicPackage(pkg, index) {
   const duration = Number(pkg.duration_minutes || 0);
 
@@ -138,7 +150,9 @@ function mapPublicPackage(pkg, index) {
       ? `${duration} Minute Session`
       : "Studio Session",
     desc: pkg.description || "",
-    image: pkg.image_url || "/assets/personal.jpg",
+    image:
+      pkg.image_url ||
+      getDefaultPackageImage(pkg.name),
 imagePosition: getPackageImagePosition(pkg.name),
 price: formatPackagePrice(pkg.default_price),
     priceValue: Number(pkg.default_price || 0),
