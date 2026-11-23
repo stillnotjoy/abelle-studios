@@ -1150,7 +1150,7 @@ const response = await fetch("/api/create-booking-request?action=validate_discou
               <small>Exact Location</small>
               <strong>Room 208, 2nd Floor, E.I. Building</strong>
               <span>
-                Calle Onse de Febrero, Tradetown Funda-Dalipe, San Jose, Antique
+                Calle Onse de Pebrero, Tradetown Funda-Dalipe, San Jose, Antique
               </span>
             </div>
 
